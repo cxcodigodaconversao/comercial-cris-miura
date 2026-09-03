@@ -20,6 +20,7 @@ export function Registrar({ perfil, evento }: { perfil: Usuario; evento: Evento 
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [cpf, setCpf] = useState("");
+  const [cep, setCep] = useState("");
   const [leadId, setLeadId] = useState<string | null>(null);
   const [dataVenda, setDataVenda] = useState("");
   const [produtoId, setProdutoId] = useState(evento.produtos[0]?.id ?? "");
@@ -85,12 +86,13 @@ export function Registrar({ perfil, evento }: { perfil: Usuario; evento: Evento 
     setEmail(lead.email || "");
     setTelefone(lead.telefone || "");
     setCpf(lead.cpf || "");
+    setCep(lead.cep || "");
     setLeadId(lead.id);
     setScanMsg(`✓ ${lead.nome}${lead.especialidade ? " · " + lead.especialidade : ""}`);
   }
 
   function limpar() {
-    setCliente(""); setEmail(""); setTelefone(""); setCpf(""); setLeadId(null);
+    setCliente(""); setEmail(""); setTelefone(""); setCpf(""); setCep(""); setLeadId(null);
     setDataVenda(""); setValor(""); setCadeira(null); setFaixa(null);
     setRecebido(""); setCompleto(null); setRestante(""); setNegociacao("");
     setObservacao(""); setScanMsg("");
@@ -122,6 +124,7 @@ export function Registrar({ perfil, evento }: { perfil: Usuario; evento: Evento 
       email: email.trim() || null,
       telefone: telefone.trim() || null,
       cpf: cpf.trim() || null,
+      cep: cep.trim() || null,
       leadId,
       dataVenda,
       produto: produto?.nome ?? null,
@@ -200,6 +203,12 @@ export function Registrar({ perfil, evento }: { perfil: Usuario; evento: Evento 
           </Field>
           <Field label="Telefone / WhatsApp">
             <Input type="tel" inputMode="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+          </Field>
+          <Field label="CPF / CNPJ" hint="Vai direto para o contrato.">
+            <Input inputMode="numeric" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
+          </Field>
+          <Field label="CEP" hint="O contrato busca o endereço por ele.">
+            <Input inputMode="numeric" value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" />
           </Field>
           <Field label="Data da venda">
             <Input type="date" value={dataVenda} onChange={(e) => setDataVenda(e.target.value)} />

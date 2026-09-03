@@ -8,7 +8,7 @@
 //
 // O mapeamento que a venda consegue dar:
 //   cliente → nome            cpf → cpf          email → email
-//   telefone → telefone       valor → valor
+//   telefone → telefone       valor → valor      cep → cep (lá busca o endereço)
 //   cadeira (2ª cadeira) → modalidade DUPLA
 //   completo (recebeu tudo) → forma VISTA; senão PRAZO
 // Endereço, entrada e parcelas ficam para quem opera preencher lá.
@@ -31,6 +31,7 @@ export function urlNovoContrato(linkBase: string, v: Venda): string {
   set("cpf", v.cpf ? v.cpf.replace(/\D/g, "") : null);
   set("email", v.email);
   set("telefone", v.telefone ? v.telefone.replace(/\D/g, "") : null);
+  set("cep", v.cep ? v.cep.replace(/\D/g, "") : null);
   set("valor", v.valor > 0 ? v.valor : null);
   set("modalidade", v.cadeira ? "DUPLA" : "INDIVIDUAL");
   set("forma", v.completo ? "VISTA" : "PRAZO");

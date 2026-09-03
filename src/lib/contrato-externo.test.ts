@@ -12,6 +12,7 @@ const venda = (p: Partial<Venda> = {}): Venda => ({
   email: "maria@exemplo.com",
   telefone: "(11) 99999-8888",
   cpf: "123.456.789-01",
+  cep: "01310-100",
   leadId: null,
   dataVenda: "2026-09-03",
   produto: "Mentoria",
@@ -48,6 +49,7 @@ describe("urlNovoContrato", () => {
     const url = new URL(urlNovoContrato("https://site.com/x", venda()));
     expect(url.searchParams.get("cpf")).toBe("12345678901");
     expect(url.searchParams.get("telefone")).toBe("11999998888");
+    expect(url.searchParams.get("cep")).toBe("01310100");
   });
 
   it("2ª cadeira vira DUPLA; sem ela, INDIVIDUAL", () => {
@@ -61,10 +63,11 @@ describe("urlNovoContrato", () => {
   });
 
   it("omite campos vazios e tolera barra no fim do link", () => {
-    const url = new URL(urlNovoContrato("https://s.com/app///", venda({ cpf: null, email: null, telefone: null })));
+    const url = new URL(urlNovoContrato("https://s.com/app///", venda({ cpf: null, email: null, telefone: null, cep: null })));
     expect(url.pathname).toBe("/app/novo");
     expect(url.searchParams.has("cpf")).toBe(false);
     expect(url.searchParams.has("email")).toBe(false);
     expect(url.searchParams.has("telefone")).toBe(false);
+    expect(url.searchParams.has("cep")).toBe(false);
   });
 });

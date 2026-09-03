@@ -19,6 +19,7 @@ const venda = (parcial: Partial<Venda>): Venda => ({
   email: null,
   telefone: null,
   cpf: null,
+  cep: null,
   leadId: null,
   dataVenda: "2026-08-17",
   produto: "Produto",

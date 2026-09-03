@@ -137,6 +137,8 @@ export type Venda = {
   email: string | null;
   telefone: string | null;
   cpf: string | null;
+  /** CEP do cliente — vai para o contrato, que busca o endereço. */
+  cep: string | null;
   leadId: string | null;
 
   dataVenda: string | null;
@@ -187,6 +189,7 @@ export type Lead = {
   nome: string;
   email: string | null;
   cpf: string | null;
+  cep: string | null;
   telefone: string | null;
   especialidade: string | null;
   cor: string | null;

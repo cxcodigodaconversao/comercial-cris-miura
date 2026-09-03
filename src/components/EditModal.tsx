@@ -28,6 +28,8 @@ export function EditModal({
   const [cliente, setCliente] = useState(venda.cliente);
   const [email, setEmail] = useState(venda.email ?? "");
   const [telefone, setTelefone] = useState(venda.telefone ?? "");
+  const [cpf, setCpf] = useState(venda.cpf ?? "");
+  const [cep, setCep] = useState(venda.cep ?? "");
   const [dataVenda, setDataVenda] = useState(venda.dataVenda ?? "");
   const [valor, setValor] = useState(String(venda.valor));
   const [recebido, setRecebido] = useState(String(venda.recebido));
@@ -66,6 +68,8 @@ export function EditModal({
       cliente: cliente.trim(),
       email: email.trim() || null,
       telefone: telefone.trim() || null,
+      cpf: cpf.trim() || null,
+      cep: cep.trim() || null,
       dataVenda: dataVenda || null,
       valor: v,
       recebido: contexto.recebido,
@@ -156,6 +160,12 @@ export function EditModal({
       </Field>
       <Field label="Telefone / WhatsApp">
         <Input type="tel" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
+      </Field>
+      <Field label="CPF / CNPJ">
+        <Input inputMode="numeric" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" />
+      </Field>
+      <Field label="CEP">
+        <Input inputMode="numeric" value={cep} onChange={(e) => setCep(e.target.value)} placeholder="00000-000" />
       </Field>
       <Field label="Data da venda">
         <Input type="date" value={dataVenda} onChange={(e) => setDataVenda(e.target.value)} />

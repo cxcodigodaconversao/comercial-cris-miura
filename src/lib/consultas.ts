@@ -22,7 +22,7 @@ export const SELECT_EVENTO =
 
 export const SELECT_VENDA =
   "id, eventoId:evento_id, usuarioId:usuario_id, closerNome:closer_nome, " +
-  "emailCloser:email_closer, cliente, email, telefone, cpf, leadId:lead_id, " +
+  "emailCloser:email_closer, cliente, email, telefone, cpf, cep, leadId:lead_id, " +
   "dataVenda:data_venda, produto, produtoId:produto_id, valor, recebido, " +
   "faixa, faixaLabel:faixa_label, cadeira, valorCadeira:valor_cadeira, " +
   "completo, restante, negociacao, observacao, pts, " +
@@ -30,7 +30,7 @@ export const SELECT_VENDA =
   "criadoEm:criado_em";
 
 export const SELECT_LEAD =
-  "id, eventoId:evento_id, codigoCracha:codigo_cracha, tipo, nome, email, cpf, " +
+  "id, eventoId:evento_id, codigoCracha:codigo_cracha, tipo, nome, email, cpf, cep, " +
   "telefone, especialidade, cor, status, abordadoPor:abordado_por, " +
   "abordadoEm:abordado_em, motivoPerda:motivo_perda";
 
@@ -59,6 +59,7 @@ export function vendaParaLinha(v: Partial<CamposVenda>) {
   põe("email", v.email);
   põe("telefone", v.telefone);
   põe("cpf", v.cpf);
+  põe("cep", v.cep);
   põe("lead_id", v.leadId);
   põe("data_venda", v.dataVenda || null); // input date vazio é "", não null
   põe("produto", v.produto);
