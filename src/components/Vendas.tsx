@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Download, FileText, Pencil, Trash2 } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/cliente";
 import { coordena, fmtData, fmtHora, fmtPts, fmtVal, leTodasAsVendas } from "@/lib/config";
 import { exportarVendasExcel } from "@/lib/exportar-vendas";
+import { urlNovoContrato } from "@/lib/contrato-externo";
 import type { Evento, Usuario, Venda } from "@/lib/types";
 import { EditModal } from "./EditModal";
 import { Badge } from "./ui/badge";
@@ -210,16 +211,31 @@ export function Vendas({
                         <Pencil className="h-3.5 w-3.5" /> Editar
                       </Button>
                     )}
-                    <Button
-                      variant={podeEditar ? "outline" : "accent"}
-                      size="sm"
-                      className={podeEditar ? undefined : "flex-1"}
-                      disabled={gerando === v.id}
-                      onClick={() => gerarContrato(v)}
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      {gerando === v.id ? "Gerando..." : v.contrato ? "Refazer contrato" : "Contrato"}
-                    </Button>
+                    {evento.linkContratos ? (
+                      // Sistema de assinatura configurado no evento: abre lá o
+                      // formulário de novo contrato já com os dados desta venda.
+                      <Button
+                        variant={podeEditar ? "outline" : "accent"}
+                        size="sm"
+                        className={podeEditar ? undefined : "flex-1"}
+                        onClick={() =>
+                          window.open(urlNovoContrato(evento.linkContratos!, v), "_blank", "noopener,noreferrer")
+                        }
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" /> Contrato
+                      </Button>
+                    ) : (
+                      <Button
+                        variant={podeEditar ? "outline" : "accent"}
+                        size="sm"
+                        className={podeEditar ? undefined : "flex-1"}
+                        disabled={gerando === v.id}
+                        onClick={() => gerarContrato(v)}
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        {gerando === v.id ? "Gerando..." : v.contrato ? "Refazer contrato" : "Contrato"}
+                      </Button>
+                    )}
                     {isAdmin && (
                       <Button
                         variant="danger-outline"

@@ -18,7 +18,7 @@ export const SELECT_USUARIO =
 export const SELECT_EVENTO =
   "id, nome, slug, marca, cidade, uf, local, " +
   "dataInicio:data_inicio, dataFim:data_fim, status, " +
-  "produtos, faixas, regras, metas, desempate, linkAnalise:link_analise, criadoEm:criado_em";
+  "produtos, faixas, regras, metas, desempate, linkAnalise:link_analise, linkContratos:link_contratos, criadoEm:criado_em";
 
 export const SELECT_VENDA =
   "id, eventoId:evento_id, usuarioId:usuario_id, closerNome:closer_nome, " +

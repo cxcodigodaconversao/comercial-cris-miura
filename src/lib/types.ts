@@ -105,6 +105,9 @@ export type Evento = {
   /** URL do painel de análise de dados — dashboard externo, fora deste app. */
   linkAnalise: string | null;
 
+  /** URL base do sistema de assinatura de contratos (externo). Sem /novo. */
+  linkContratos: string | null;
+
   criadoEm: string;
 };
 

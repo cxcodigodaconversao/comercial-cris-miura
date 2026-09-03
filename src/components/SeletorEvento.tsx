@@ -185,6 +185,7 @@ function FormEvento({
     String(evento?.metas?.find((m) => m.escopo === "evento")?.valor ?? "")
   );
   const [linkAnalise, setLinkAnalise] = useState(evento?.linkAnalise ?? "");
+  const [linkContratos, setLinkContratos] = useState(evento?.linkContratos ?? "");
   const [busy, setBusy] = useState(false);
 
   async function salvar() {
@@ -217,6 +218,7 @@ function FormEvento({
       status,
       desempate,
       link_analise: linkAnalise.trim() || null,
+      link_contratos: linkContratos.trim().replace(/\/+$/, "") || null,
       metas,
     };
 
@@ -349,6 +351,18 @@ function FormEvento({
           value={linkAnalise}
           onChange={(e) => setLinkAnalise(e.target.value)}
           placeholder="https://..."
+        />
+      </Field>
+
+      <Field
+        label="Link do sistema de contratos (opcional)"
+        hint="URL base do app de assinatura, sem /novo. Preenchido, o botão Contrato de cada venda abre lá o formulário já com os dados da venda."
+      >
+        <Input
+          type="url"
+          value={linkContratos}
+          onChange={(e) => setLinkContratos(e.target.value)}
+          placeholder="https://seudominio.com.br/assinatura-dex"
         />
       </Field>
     </Sheet>

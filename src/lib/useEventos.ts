@@ -31,6 +31,7 @@ export const EVENTO_PROVISORIO: Evento = {
   metas: [],
   desempate: "recebido",
   linkAnalise: null,
+  linkContratos: null,
   criadoEm: "",
 };
 
