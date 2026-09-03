@@ -1,0 +1,303 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Design system "Editorial Clínico" — portado do app de navegação do DTC
+   (dtc-navegacao/src/app/globals.css). Papel quente + tinta + acento spruce.
+
+   Diferenças propositais em relação ao DTC, por ser um app de EVENTO usado
+   no celular, em pé, no salão:
+     · alvos de toque grandes (>=48px) e inputs em 16px (abaixo disso o iOS
+       dá zoom sozinho ao focar o campo);
+     · área segura do iPhone (--safe-bottom);
+     · container de 480px, não layout de dashboard.
+
+   O acento --brand é a cor da MARCA DO EVENTO (IMA BH, Mentoria, Congresso…). Ele é
+   sobrescrito em runtime pelo evento selecionado; o spruce é só o padrão.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-weak: var(--accent-weak);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-ink: var(--ink);
+  --color-brand: var(--brand);
+  --color-brand-weak: var(--brand-weak);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-newsreader);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.85);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.6);
+  --radius-2xl: calc(var(--radius) * 2.1);
+}
+
+:root {
+  /* Editorial Clínico — papel quente + tinta */
+  --background: #f4f2ec;
+  --foreground: #1c1d18;
+  --card: #fcfbf8;
+  --card-foreground: #1c1d18;
+  --muted: #ebe8e0;
+  --muted-foreground: #6b6a60;
+  --border: #e1ddd2;
+  --border-strong: #d2cdbf;
+  --input: #dcd8cc;
+
+  /* Acento único: verde-spruce profundo (sólido, sem degradê) */
+  --accent: #1e5848;
+  --accent-foreground: #f4f2ec;
+  --accent-weak: rgba(30, 88, 72, 0.09);
+
+  --primary: #1e5848;
+  --primary-foreground: #f4f2ec;
+
+  --ring: rgba(30, 88, 72, 0.3);
+  --destructive: #9e3b30;
+  --success: #2e6a45;
+  --warning: #8e6418;
+
+  /* Superfície escura editorial (flat) */
+  --ink: #181a14;
+
+  /* Marca do evento — sobrescrita em runtime. Padrão = o acento. */
+  --brand: #0e6b66;
+  --brand-weak: rgba(14, 107, 102, 0.09);
+
+  --radius: 0.55rem;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    height: 100%;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    min-height: 100%;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgba(30, 88, 72, 0.16);
+  }
+}
+
+/* Classes de componente ficam em `components` (não `utilities`): assim um
+   utilitário como `pl-9` SEMPRE vence o `padding` do `.inp`. Convenção
+   herdada do DTC — lá o ícone dentro do input encostava no texto. */
+@layer components {
+  /* ── Tipografia editorial ───────────────────────────────────────── */
+  .display {
+    font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+    font-weight: 420;
+    letter-spacing: -0.012em;
+  }
+  .eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 0.6875rem;
+    line-height: 1;
+    color: var(--muted-foreground);
+  }
+  .num {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tint {
+    background: var(--accent-weak);
+  }
+  .tint-brand {
+    background: var(--brand-weak);
+  }
+
+  /* ── Superfícies ────────────────────────────────────────────────── */
+  .card-elev {
+    box-shadow: 0 1px 2px rgba(28, 29, 24, 0.04);
+  }
+  .card-elev-lg {
+    box-shadow:
+      0 1px 2px rgba(28, 29, 24, 0.05),
+      0 16px 40px -28px rgba(28, 29, 24, 0.28);
+  }
+  .surface-ink {
+    background: var(--ink);
+    color: #e7e5dc;
+  }
+  .grid-lines {
+    background-image:
+      linear-gradient(to right, rgba(231, 229, 220, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(231, 229, 220, 0.05) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .ring-focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ring);
+    border-color: var(--accent);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* ── Formulário (mobile) ────────────────────────────────────────── */
+  /* 16px é obrigatório: com fonte menor o Safari do iPhone dá zoom no
+     foco do campo e desloca o layout inteiro. */
+  .inp {
+    width: 100%;
+    min-height: 48px;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-strong);
+    background: var(--card);
+    padding: 0.75rem 0.875rem;
+    font-size: 16px;
+    line-height: 1.4;
+    color: var(--foreground);
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .inp:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .inp::placeholder {
+    color: var(--muted-foreground);
+    opacity: 0.7;
+  }
+  textarea.inp {
+    resize: none;
+    line-height: 1.55;
+  }
+  select.inp {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6a60' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 2.25rem;
+  }
+
+  .field {
+    margin-bottom: 0.875rem;
+  }
+  .field:last-child {
+    margin-bottom: 0;
+  }
+  .field > label {
+    display: block;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted-foreground);
+    margin-bottom: 0.4rem;
+  }
+
+  /* ── Escolha binária e lista de opções ──────────────────────────── */
+  .choice {
+    flex: 1;
+    min-height: 48px;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-strong);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-align: center;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .choice[data-state="sim"] {
+    background: var(--accent-weak);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .choice[data-state="nao"] {
+    background: rgba(158, 59, 48, 0.08);
+    border-color: var(--destructive);
+    color: var(--destructive);
+    font-weight: 600;
+  }
+
+  .option {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.8125rem 0.875rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-strong);
+    background: var(--card);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    text-align: left;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .option[data-selected="true"] {
+    background: var(--accent-weak);
+    border-color: var(--accent);
+    color: var(--foreground);
+  }
+  .option-dot {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    border: 2px solid var(--border-strong);
+    flex-shrink: 0;
+  }
+  .option[data-selected="true"] .option-dot {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: inset 0 0 0 2.5px var(--card);
+  }
+
+  /* ── Navegação por abas (mobile, rolável) ───────────────────────── */
+  .tab {
+    flex: none;
+    padding: 0.75rem 0.875rem;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  .tab[data-active="true"] {
+    color: var(--foreground);
+    border-bottom-color: var(--accent);
+  }
+}
