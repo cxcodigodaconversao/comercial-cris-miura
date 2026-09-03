@@ -53,42 +53,30 @@ export const CORES_MARCA = {
 } as const;
 
 // ── Padrões de um evento novo ───────────────────────────────────────────
-// São exatamente as regras que a v1 tinha cravadas no código. Servem de
-// ponto de partida ao criar evento — ajuste por operação na tela própria.
+// Calibrado para o ticket de R$ 35.000. Servem de ponto de partida ao criar
+// evento — ajuste por operação na tela própria.
+//
+// `min` e `max` são INCLUSIVOS: R$ 35.963 cai na faixa do meio, e a faixa
+// alta começa em R$ 35.963,01.
 
 export const FAIXAS_PADRAO: Faixa[] = [
   { label: "Abaixo de R$ 15.000", min: 0, max: 14999.99 },
-  { label: "R$ 15.000 até R$ 29.996", min: 15000, max: 29996.99 },
-  { label: "Acima de R$ 29.997", min: 29997 },
+  { label: "R$ 15.000 até R$ 35.963", min: 15000, max: 35963 },
+  { label: "Acima de R$ 35.963", min: 35963.01 },
 ];
 
 export const PRODUTOS_PADRAO: Produto[] = [{ id: "produto-principal", nome: "Produto principal (edite no evento)" }];
 
 export const REGRAS_PADRAO: Regra[] = [
   {
-    id: "base",
-    label: "Ponto recorrente (base)",
-    tag: "1",
-    pontos: 1,
-    tipo: "base",
-    ativo: true,
-  },
-  {
-    id: "faixa-alta",
-    label: "Recebido acima de R$ 15.000",
-    tag: "+1",
-    pontos: 1,
-    tipo: "condicao",
-    condicoes: [{ campo: "faixaIndex", op: ">=", valor: 1 }],
-    ativo: true,
-  },
-  {
-    id: "completo",
-    label: "Recebimento completo",
-    tag: "+1",
-    pontos: 1,
-    tipo: "condicao",
-    condicoes: [{ campo: "completo", op: "é", valor: true }],
+    // Pontos escalonados por faixa (1 / 2 / 3), não somados: a posição na
+    // tabela é o índice da faixa em FAIXAS_PADRAO, na mesma ordem.
+    id: "faixa",
+    label: "Pontos por faixa de recebimento",
+    tag: "1-3",
+    pontos: 0, // não usado em porFaixa: quem manda é pontosPorFaixa
+    tipo: "porFaixa",
+    pontosPorFaixa: [1, 2, 3],
     ativo: true,
   },
   {
