@@ -4,12 +4,18 @@ import { FAIXAS_PADRAO, REGRAS_PADRAO } from "./config";
 import type { Regra } from "./types";
 
 /**
- * O contrato mais importante deste arquivo é o primeiro bloco: as regras
- * configuráveis PRECISAM devolver exatamente o que a getPts() da v1 devolvia,
- * senão a migração muda a pontuação (e a comissão) de todo mundo.
+ * O contrato mais importante deste arquivo é o primeiro bloco: a tabela de
+ * pontos por faixa PRECISA bater exatamente com o combinado com o cliente,
+ * senão a pontuação (e a comissão) de todo mundo muda.
  *
- * getPts original:
- *   total = 1 + (faixa >= 1 ? 1 : 0) + (completo ? 1 : 0) + (cadeira ? 0.5 : 0)
+ * Regra vigente (ticket de R$ 35.000):
+ *   · faixa 0 — abaixo de R$ 15.000 .............. 1 ponto
+ *   · faixa 1 — R$ 15.000 até R$ 35.963 .......... 2 pontos
+ *   · faixa 2 — acima de R$ 35.963 ............... 3 pontos
+ *   · 2ª cadeira ................................. +0,5
+ *
+ * Os pontos de faixa NÃO se somam entre si: a faixa define o valor, e a 2ª
+ * cadeira é o único acréscimo.
  */
 
 function ctx(p: Partial<ContextoVenda> = {}): ContextoVenda {
@@ -24,12 +30,13 @@ function ctx(p: Partial<ContextoVenda> = {}): ContextoVenda {
   };
 }
 
-/** Reimplementação literal da v1, para comparar contra o motor novo. */
-function getPtsV1(faixa: number | null, completo: boolean | null, cadeira: boolean | null) {
-  return 1 + (faixa !== null && faixa >= 1 ? 1 : 0) + (completo ? 1 : 0) + (cadeira ? 0.5 : 0);
+/** A tabela combinada, escrita à mão para comparar contra o motor. */
+function pontosEsperados(faixa: number | null, cadeira: boolean | null) {
+  const porFaixa = faixa === null ? 0 : [1, 2, 3][faixa] ?? 0;
+  return porFaixa + (cadeira ? 0.5 : 0);
 }
 
-describe("paridade com a pontuação da v1", () => {
+describe("tabela de pontos por faixa", () => {
   const faixas = [null, 0, 1, 2];
   const simNao = [null, true, false];
 
@@ -41,24 +48,46 @@ describe("paridade com a pontuação da v1", () => {
             REGRAS_PADRAO,
             ctx({ faixaIndex: f, completo: c, cadeira: cad })
           );
-          expect(total).toBe(getPtsV1(f, c, cad));
+          expect(total).toBe(pontosEsperados(f, cad));
         });
       }
     }
   }
 
-  it("cobre os 4 selos no detalhe, mesmo os que não pontuaram", () => {
-    const { detalhe } = calcularPontos(REGRAS_PADRAO, ctx({ faixaIndex: 0 }));
-    expect(detalhe).toHaveLength(4);
-    expect(detalhe.map((d) => d.pontos)).toEqual([1, 0, 0, 0]);
+  it("cada faixa vale 1, 2 e 3 pontos", () => {
+    const pts = (faixaIndex: number) =>
+      calcularPontos(REGRAS_PADRAO, ctx({ faixaIndex })).total;
+    expect(pts(0)).toBe(1);
+    expect(pts(1)).toBe(2);
+    expect(pts(2)).toBe(3);
   });
 
-  it("a venda máxima da v1 dá 3,5 pontos", () => {
+  it("o recebimento completo não altera a pontuação", () => {
+    const semCompleto = calcularPontos(REGRAS_PADRAO, ctx({ faixaIndex: 1 })).total;
+    const comCompleto = calcularPontos(
+      REGRAS_PADRAO,
+      ctx({ faixaIndex: 1, completo: true })
+    ).total;
+    expect(comCompleto).toBe(semCompleto);
+  });
+
+  it("venda sem faixa definida não pontua pela tabela", () => {
+    const { total } = calcularPontos(REGRAS_PADRAO, ctx({ faixaIndex: null }));
+    expect(total).toBe(0);
+  });
+
+  it("a venda máxima dá 3,5 pontos", () => {
     const { total } = calcularPontos(
       REGRAS_PADRAO,
-      ctx({ faixaIndex: 2, completo: true, cadeira: true })
+      ctx({ faixaIndex: 2, cadeira: true })
     );
     expect(total).toBe(3.5);
+  });
+
+  it("mostra os dois selos no detalhe, mesmo o que não pontuou", () => {
+    const { detalhe } = calcularPontos(REGRAS_PADRAO, ctx({ faixaIndex: 0 }));
+    expect(detalhe).toHaveLength(2);
+    expect(detalhe.map((d) => d.pontos)).toEqual([1, 0]);
   });
 });
 
@@ -182,10 +211,10 @@ describe("regra por faixa", () => {
 
 describe("higiene do motor", () => {
   it("regra inativa não entra nem no total nem no detalhe", () => {
-    const r = REGRAS_PADRAO.map((x) => (x.id === "base" ? { ...x, ativo: false } : x));
+    const r = REGRAS_PADRAO.map((x) => (x.id === "faixa" ? { ...x, ativo: false } : x));
     const res = calcularPontos(r, ctx({ faixaIndex: 2, completo: true, cadeira: true }));
-    expect(res.total).toBe(2.5);
-    expect(res.detalhe.find((d) => d.regraId === "base")).toBeUndefined();
+    expect(res.total).toBe(0.5);
+    expect(res.detalhe.find((d) => d.regraId === "faixa")).toBeUndefined();
   });
 
   it("campo desconhecido não pontua e não lança", () => {
@@ -238,7 +267,10 @@ describe("faixaDoValor", () => {
     expect(faixaDoValor(FAIXAS_PADRAO, 0)).toBe(0);
     expect(faixaDoValor(FAIXAS_PADRAO, 14999)).toBe(0);
     expect(faixaDoValor(FAIXAS_PADRAO, 15000)).toBe(1);
-    expect(faixaDoValor(FAIXAS_PADRAO, 29997)).toBe(2);
+    // As bordas do combinado: 35.963 ainda é faixa do meio; 1 centavo acima já sobe.
+    expect(faixaDoValor(FAIXAS_PADRAO, 35000)).toBe(1);
+    expect(faixaDoValor(FAIXAS_PADRAO, 35963)).toBe(1);
+    expect(faixaDoValor(FAIXAS_PADRAO, 35963.01)).toBe(2);
     expect(faixaDoValor(FAIXAS_PADRAO, 500000)).toBe(2);
   });
 
