@@ -21,6 +21,7 @@ import { useFeedback } from "./ui/feedback";
 export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Venda[]; perfil: Usuario }) {
   const { toast } = useFeedback();
   const [inscritos, setInscritos] = useState<Inscrito[] | null>(null);
+  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isAdmin = perfil.papel === "admin";
@@ -31,7 +32,9 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
       .select(SELECT_INSCRITO)
       .eq("evento_id", evento.id);
     if (error) return toast("erro", "Não foi possível carregar a análise.", error.message);
-    setInscritos((data ?? []) as unknown as Inscrito[]);
+    const linhas = (data ?? []) as unknown as (Inscrito & { importadoEm?: string })[];
+    setInscritos(linhas);
+    setAtualizadoEm(linhas[0]?.importadoEm ?? null);
   }
 
   useEffect(() => {
@@ -70,33 +73,13 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
 
   return (
     <>
-      {isAdmin && (
-        <Card className="mb-3">
-          <CardContent className="pt-4">
-            <SectionLabel>Base de inscritos</SectionLabel>
-            <p className="mt-1 text-sm text-muted">
-              Suba o <span className="num">index.html</span> do painel de conversão. A importação substitui a base
-              do evento inteira.
-            </p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".html,.htm,.json"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])}
-            />
-            <Button variant="outline" full className="mt-3" disabled={ocupado} onClick={() => inputRef.current?.click()}>
-              <Upload className="h-4 w-4" />
-              {ocupado ? "Importando..." : inscritos?.length ? "Reimportar painel" : "Importar painel"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {inscritos === null ? (
         <Empty>Carregando…</Empty>
       ) : !a || a.total === 0 ? (
-        <Empty>Nenhum inscrito importado para este evento ainda.</Empty>
+        <>
+          <Empty>Nenhum inscrito importado para este evento ainda.</Empty>
+          {isAdmin && <CardImportar />}
+        </>
       ) : (
         <>
           {/* ── Conversão: o que só o app consegue mostrar ────────────── */}
@@ -165,10 +148,46 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
           <Bloco titulo="Tempo de formado(a)" itens={a.tempoFormado} />
           <Bloco titulo="Área de atuação" itens={a.area} limite={8} />
           <Bloco titulo="Faixa etária" itens={a.idade} />
+          {isAdmin && <CardImportar />}
         </>
       )}
     </>
   );
+
+  /**
+   * Fica no FIM da tela de propósito: atualizar a base é tarefa ocasional do
+   * admin, e quem abre a aba quer ver os números primeiro. Quando ainda não
+   * há base, o card sobe para o topo — aí é a única coisa a fazer aqui.
+   */
+  function CardImportar() {
+    return (
+      <Card className="mb-3">
+        <CardContent className="pt-4">
+          <SectionLabel>Atualizar base de inscritos</SectionLabel>
+          <p className="mt-1 text-sm text-muted">
+            Suba o <span className="num">index.html</span> do painel de conversão para atualizar os dados. A
+            importação substitui a base deste evento inteira — os números acima recalculam sozinhos.
+          </p>
+          {atualizadoEm && (
+            <p className="num mt-2 text-xs text-muted">
+              Última atualização: {new Date(atualizadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+            </p>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".html,.htm,.json"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])}
+          />
+          <Button variant="outline" full className="mt-3" disabled={ocupado} onClick={() => inputRef.current?.click()}>
+            <Upload className="h-4 w-4" />
+            {ocupado ? "Importando..." : inscritos?.length ? "Subir novo HTML" : "Importar painel"}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 }
 
 // ── Peças ──────────────────────────────────────────────────────────────
