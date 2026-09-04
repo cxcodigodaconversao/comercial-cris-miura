@@ -105,4 +105,4 @@ export const SELECT_INSCRITO =
   "faturamento, idade, tempoFormado:tempo_formado, areaAtuacao:area_atuacao, " +
   "categoriaTicket:categoria_ticket, temProduto:tem_produto, produtos, " +
   "checkinFeito:checkin_feito, d1, d2, d3, ligou, resultadoLigacao:resultado_ligacao, " +
-  "contatoConfirmou:contato_confirmou, extras";
+  "contatoConfirmou:contato_confirmou, extras, importadoEm:importado_em";
