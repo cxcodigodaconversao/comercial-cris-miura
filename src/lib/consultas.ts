@@ -82,6 +82,9 @@ export function vendaParaLinha(v: Partial<CamposVenda>) {
 
 /** Rótulo legível de cada coluna, para o log de auditoria e as mensagens. */
 export const NOME_DO_CAMPO: Record<string, string> = {
+  closerNome: "vendedor",
+  usuarioId: "vendedor (id)",
+  emailCloser: "e-mail do vendedor",
   cliente: "cliente",
   email: "e-mail",
   telefone: "telefone",

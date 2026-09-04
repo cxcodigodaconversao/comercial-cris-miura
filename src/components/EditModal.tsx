@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/cliente";
 import { NOME_DO_CAMPO, vendaParaLinha, type CamposVenda } from "@/lib/consultas";
 import { coordena, fmtPts } from "@/lib/config";
@@ -24,8 +24,38 @@ export function EditModal({
 }) {
   const { toast } = useFeedback();
   const podeCoordenar = coordena(perfil.papel);
+  // Só admin corrige o vendedor: transferir venda é transferir ponto no
+  // ranking. O banco também trava isso (migração 0013), não só a tela.
+  const podeTrocarVendedor = perfil.papel === "admin";
 
   const [cliente, setCliente] = useState(venda.cliente);
+  const [dono, setDono] = useState({
+    id: venda.usuarioId,
+    nome: venda.closerNome,
+    email: venda.emailCloser,
+  });
+  const [vendedores, setVendedores] = useState<Usuario[]>([]);
+
+  // Lista para o seletor: só quem pode ser dono de venda, e sempre com o
+  // dono atual incluído — mesmo desativado, senão o campo abre vazio e
+  // parece que a venda perdeu o vendedor.
+  useEffect(() => {
+    if (!podeTrocarVendedor) return;
+    (async () => {
+      const { data } = await supabase
+        .from("usuarios")
+        .select("id, nome, email, papel, ativo")
+        .in("papel", ["admin", "gestor", "closer"])
+        .eq("ativo", true)
+        .order("nome");
+      const lista = (data ?? []) as Usuario[];
+      setVendedores(
+        lista.some((u) => u.id === venda.usuarioId)
+          ? lista
+          : [...lista, { id: venda.usuarioId, nome: venda.closerNome, email: venda.emailCloser } as Usuario]
+      );
+    })();
+  }, [podeTrocarVendedor, venda.usuarioId, venda.closerNome, venda.emailCloser]);
   const [email, setEmail] = useState(venda.email ?? "");
   const [telefone, setTelefone] = useState(venda.telefone ?? "");
   const [cpf, setCpf] = useState(venda.cpf ?? "");
@@ -65,6 +95,9 @@ export function EditModal({
     if (!cliente.trim()) return toast("aviso", "O nome do cliente não pode ficar em branco.");
 
     const campos: Partial<CamposVenda> = {
+      ...(podeTrocarVendedor
+        ? { usuarioId: dono.id, closerNome: dono.nome, emailCloser: dono.email }
+        : {}),
       cliente: cliente.trim(),
       email: email.trim() || null,
       telefone: telefone.trim() || null,
@@ -152,6 +185,17 @@ export function EditModal({
         </>
       }
     >
+      {podeTrocarVendedor && (
+        <Field label="Vendedor" hint="Corrige uma venda lançada no login errado. Move os pontos no ranking.">
+          <OptionList
+            options={vendedores}
+            selected={dono.id}
+            getKey={(u) => u.id}
+            getLabel={(u) => u.nome}
+            onChange={(u) => setDono({ id: u.id, nome: u.nome, email: u.email })}
+          />
+        </Field>
+      )}
       <Field label="Cliente">
         <Input value={cliente} onChange={(e) => setCliente(e.target.value)} />
       </Field>
