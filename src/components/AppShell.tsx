@@ -13,6 +13,7 @@ import { Ranking } from "./Ranking";
 import { MeusPontos } from "./MeusPontos";
 import { Vendas } from "./Vendas";
 import { MeusLinks } from "./MeusLinks";
+import { Analise } from "./Analise";
 import { PlanoContrato } from "./PlanoContrato";
 import { SenhaModal } from "./SenhaModal";
 import { Usuarios } from "./Usuarios";
@@ -21,7 +22,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Sheet } from "./ui/sheet";
 
-type Aba = "registrar" | "ranking" | "pontos" | "vendas" | "links" | "usuarios" | "contrato";
+type Aba = "registrar" | "ranking" | "pontos" | "vendas" | "links" | "usuarios" | "contrato" | "analise";
 
 export function AppShell({ perfil }: { perfil: Usuario }) {
   const isAdmin = perfil.papel === "admin";
@@ -54,6 +55,7 @@ export function AppShell({ perfil }: { perfil: Usuario }) {
     lista.push({ id: "vendas", label: "Vendas" });
     if (isPromotor) lista.push({ id: "contrato", label: "Contrato" });
     lista.push({ id: "links", label: "Links" });
+    if (veTudo) lista.push({ id: "analise", label: "Análise" });
     return lista;
   }, [veTudo, isPromotor]);
 
@@ -115,6 +117,7 @@ export function AppShell({ perfil }: { perfil: Usuario }) {
           <PlanoContrato perfil={perfil} evento={evento} vendas={vendas} />
         )}
         {aba === "links" && <MeusLinks perfil={perfil} evento={evento} />}
+        {aba === "analise" && veTudo && <Analise evento={evento} vendas={vendas} perfil={perfil} />}
         {aba === "usuarios" && isAdmin && <Usuarios perfil={perfil} />}
       </main>
 

@@ -99,3 +99,10 @@ export const NOME_DO_CAMPO: Record<string, string> = {
   pts: "pontos",
   pontosDetalhe: "detalhe da pontuação",
 };
+
+export const SELECT_INSCRITO =
+  "email, nome, whatsapp, classe, nota, perfil, comprometimento, tipo, jaAluno:ja_aluno, " +
+  "faturamento, idade, tempoFormado:tempo_formado, areaAtuacao:area_atuacao, " +
+  "categoriaTicket:categoria_ticket, temProduto:tem_produto, produtos, " +
+  "checkinFeito:checkin_feito, d1, d2, d3, ligou, resultadoLigacao:resultado_ligacao, " +
+  "contatoConfirmou:contato_confirmou, extras";
