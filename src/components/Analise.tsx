@@ -124,7 +124,7 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
               <SectionLabel>Lead Score</SectionLabel>
               <div className="mt-2 flex gap-2">
                 <Kpi valor={String(a.total)} rotulo="Inscritos" />
-                <Kpi valor={String(a.comNota)} rotulo="Com nota" />
+                <Kpi valor={String(a.comNota)} rotulo="Respondeu formulário" />
                 <Kpi valor={String(a.jaAlunos)} rotulo="Já alunos" />
               </div>
               <div className="mt-3 flex gap-2 border-t border-border pt-3">
