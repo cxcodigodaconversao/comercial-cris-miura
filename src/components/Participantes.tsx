@@ -5,13 +5,15 @@ import { ArrowLeft, Instagram, MessageCircle, Search, Send } from "lucide-react"
 import { supabase } from "@/lib/supabase/cliente";
 import { SELECT_ABORDAGEM, SELECT_INSCRITO } from "@/lib/consultas";
 import { fmtVal } from "@/lib/config";
-import { normalizarEmail, type Classe, type Inscrito } from "@/lib/analise";
+import { CLASSES, normalizarEmail, type Classe, type Inscrito } from "@/lib/analise";
 import {
   abordagensPorEmail,
+  contarPorClasse,
   detalhesDe,
   ehAluno,
   ehNaoAluno,
   filtrarAluno,
+  filtrarClasse,
   filtrarParticipantes,
   filtrarPresenca,
   linkInstagram,
@@ -46,6 +48,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
   const [termo, setTermo] = useState("");
   const [presenca, setPresenca] = useState<FiltroPresenca>("todos");
   const [aluno, setAluno] = useState<FiltroAluno>("todos");
+  const [classes, setClasses] = useState<Set<Classe>>(new Set());
   const [aberto, setAberto] = useState<Inscrito | null>(null);
   const [abordagens, setAbordagens] = useState<Abordagem[]>([]);
 
@@ -55,6 +58,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     setTermo("");
     setPresenca("todos");
     setAluno("todos");
+    setClasses(new Set());
     (async () => {
       const { data, error } = await supabase
         .from("inscritos")
@@ -107,14 +111,35 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
   const lista = useMemo(
     () =>
       inscritos
-        ? ordenarParticipantes(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno))
+        ? ordenarParticipantes(
+            filtrarClasse(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), classes)
+          )
         : [],
+    [inscritos, termo, presenca, aluno, classes]
+  );
+
+  /** Contagem por classe respeitando os OUTROS filtros (busca, presença,
+   *  aluno) — assim o número no chip é "quantos dessa classe eu veria". */
+  const porClasse = useMemo(
+    () =>
+      contarPorClasse(
+        inscritos ? filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno) : []
+      ),
     [inscritos, termo, presenca, aluno]
   );
 
+  function alternarClasse(c: Classe) {
+    setClasses((atual) => {
+      const n = new Set(atual);
+      if (n.has(c)) n.delete(c);
+      else n.add(c);
+      return n;
+    });
+  }
+
   /** Contadores dos chips: presentes vêm do painel importado, não do app. */
   const resumo = useMemo(() => (inscritos ? resumoPresenca(inscritos) : null), [inscritos]);
-  const filtrando = Boolean(termo) || presenca !== "todos" || aluno !== "todos";
+  const filtrando = Boolean(termo) || presenca !== "todos" || aluno !== "todos" || classes.size > 0;
 
   if (inscritos === null) return <Empty>Carregando…</Empty>;
   if (!inscritos.length) {
@@ -168,6 +193,47 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
               ]}
             />
           </div>
+          {/* Lead Score: filtro e legenda ao mesmo tempo. Cores do painel;
+              toque liga/desliga a classe, pode marcar várias. */}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {CLASSES.map((c) => {
+              const ativo = classes.has(c);
+              const apagado = classes.size > 0 && !ativo;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => alternarClasse(c)}
+                  title={LEGENDA[c]}
+                  className={`num inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-semibold transition-opacity ${
+                    apagado ? "opacity-35" : ""
+                  } ${ativo ? "ring-2 ring-foreground ring-offset-1 ring-offset-card" : ""}`}
+                  style={{ backgroundColor: COR[c].fundo, color: COR[c].texto }}
+                >
+                  {c}
+                  <span className="font-normal opacity-80">{porClasse[c]}</span>
+                </button>
+              );
+            })}
+            {classes.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setClasses(new Set())}
+                className="h-7 rounded-full px-2.5 text-xs text-muted-foreground underline underline-offset-2"
+              >
+                limpar
+              </button>
+            )}
+          </div>
+          <p className="mt-1.5 text-[11px] leading-snug text-muted">
+            {CLASSES.map((c, k) => (
+              <span key={c}>
+                {k > 0 && " · "}
+                <span className="font-semibold">{c}</span> {LEGENDA_CURTA[c]}
+              </span>
+            ))}
+          </p>
           <p className="mt-2 text-xs text-muted">
             {lista.length} de {inscritos.length} participante{inscritos.length === 1 ? "" : "s"}
             {filtrando ? " (filtrado)" : ""}
@@ -451,6 +517,28 @@ const COR: Record<Classe, { fundo: string; texto: string }> = {
   E: { fundo: "#a58f6f", texto: "#FFFFFF" },
   F: { fundo: "#8d6b6b", texto: "#FFFFFF" },
   X: { fundo: "#5c6b78", texto: "#FFFFFF" },
+};
+
+/** Mesma legenda do painel ("ordem de ligação, não corte de qualidade"). */
+const LEGENDA: Record<Classe, string> = {
+  AA: "AA · Aluno no topo",
+  A: "A · Topo 15%",
+  B: "B · Alto 15–30%",
+  C: "C · Médio-alto 30–50%",
+  D: "D · Médio 50–70%",
+  E: "E · Baixo 70–90%",
+  F: "F · Últimos 10%",
+  X: "X · Sem formulário",
+};
+const LEGENDA_CURTA: Record<Classe, string> = {
+  AA: "aluno no topo",
+  A: "topo 15%",
+  B: "15–30%",
+  C: "30–50%",
+  D: "50–70%",
+  E: "70–90%",
+  F: "últimos 10%",
+  X: "sem formulário",
 };
 
 function ClasseSelo({ classe, nota, grande }: { classe: Classe; nota: number | null; grande?: boolean }) {

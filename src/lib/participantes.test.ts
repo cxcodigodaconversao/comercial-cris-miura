@@ -3,6 +3,8 @@ import { normalizarLinha } from "./analise";
 import type { Abordagem } from "./types";
 import {
   abordagensPorEmail,
+  contarPorClasse,
+  filtrarClasse,
   detalhesDe,
   ehAluno,
   estaPresente,
@@ -105,6 +107,21 @@ describe("presença e aluno", () => {
       { dia: 2, n: 1, alunos: 1, naoAlunos: 0, semResposta: 0 },
       { dia: 3, n: 1, alunos: 0, naoAlunos: 1, semResposta: 0 },
     ]);
+  });
+});
+
+describe("filtrarClasse", () => {
+  const lista = [p({ email: "a@x", classe: "AA" }), p({ email: "b@x", classe: "B" }), p({ email: "x@x", classe: "X", nota: null })];
+  it("vazio = todas; com seleção, só as marcadas", () => {
+    expect(filtrarClasse(lista, new Set())).toHaveLength(3);
+    expect(filtrarClasse(lista, new Set(["AA", "B"] as const)).map((i) => i.email)).toEqual(["a@x", "b@x"]);
+  });
+  it("conta por classe, com zero nas ausentes", () => {
+    const c = contarPorClasse(lista);
+    expect(c.AA).toBe(1);
+    expect(c.B).toBe(1);
+    expect(c.X).toBe(1);
+    expect(c.F).toBe(0);
   });
 });
 

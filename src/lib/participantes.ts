@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 
 import type { Abordagem } from "./types";
-import type { Inscrito } from "./analise";
+import { CLASSES, type Classe, type Inscrito } from "./analise";
 
 /** Minúsculo e sem acento, para comparar texto digitado com texto da base. */
 export function semAcento(s: string): string {
@@ -91,6 +91,21 @@ export function filtrarAluno(lista: Inscrito[], filtro: FiltroAluno): Inscrito[]
   if (filtro === "alunos") return lista.filter(ehAluno);
   if (filtro === "nao_alunos") return lista.filter(ehNaoAluno);
   return lista;
+}
+
+/**
+ * Filtro por classe de Lead Score. Conjunto vazio = todas. Multi-seleção
+ * de propósito: "AA + A + B" (MQL top) é o recorte mais pedido no salão.
+ */
+export function filtrarClasse(lista: Inscrito[], classes: ReadonlySet<Classe>): Inscrito[] {
+  return classes.size ? lista.filter((i) => classes.has(i.classe)) : lista;
+}
+
+/** Quantos inscritos por classe, para o número nos chips. */
+export function contarPorClasse(lista: Inscrito[]): Record<Classe, number> {
+  const c = Object.fromEntries(CLASSES.map((k) => [k, 0])) as Record<Classe, number>;
+  for (const i of lista) c[i.classe]++;
+  return c;
 }
 
 export type ResumoPresenca = {
