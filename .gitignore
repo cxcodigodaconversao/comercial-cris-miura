@@ -1,0 +1,12 @@
+# dependências e build
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# ambiente local (chaves)
+.env*.local
+.env
+
+# sistema
+.DS_Store
