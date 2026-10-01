@@ -192,7 +192,6 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
                 onClick={() => setAberto(i)}
                 className="flex w-full items-center gap-3 py-3 text-left"
               >
-                <ClasseSelo classe={i.classe} nota={i.nota} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{i.nome}</span>
                   <span className="block truncate text-xs text-muted-foreground">
@@ -216,6 +215,9 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
                     sem abrir a ficha — em que dia(s) a pessoa esteve e se já
                     é aluna. Os dias chegam prontos do painel importado. */}
                 <span className="flex shrink-0 flex-col items-end gap-1">
+                  {/* Lead Score primeiro, na cor da classe do painel: é o que
+                      define a ordem de abordagem, então tem que bater o olho. */}
+                  <ClasseSelo classe={i.classe} nota={i.nota} />
                   {rotulosPresenca(i).map((r) => (
                     <Badge key={r} tone="success" className="whitespace-nowrap">
                       {r}
@@ -435,28 +437,34 @@ function Chips<T extends string>({
   );
 }
 
-const COR: Record<Classe, string> = {
-  AA: "bg-accent text-accent-foreground",
-  A: "bg-accent/80 text-accent-foreground",
-  B: "bg-accent/60 text-accent-foreground",
-  C: "bg-accent/45 text-accent-foreground",
-  D: "bg-accent/30",
-  E: "bg-accent/20",
-  F: "bg-accent/12",
-  X: "bg-border/60 text-muted",
+/**
+ * Cores por classe — as MESMAS do painel de conversão (variáveis --AA…--X
+ * do index.html), para o time reconhecer a classe de um sistema no outro.
+ * Texto escuro nas cores claras, claro nas escuras.
+ */
+const COR: Record<Classe, { fundo: string; texto: string }> = {
+  AA: { fundo: "#c9a35a", texto: "#1C1D18" },
+  A: { fundo: "#e2c27e", texto: "#1C1D18" },
+  B: { fundo: "#6fa8dc", texto: "#1C1D18" },
+  C: { fundo: "#8fb7a3", texto: "#1C1D18" },
+  D: { fundo: "#8d9bb3", texto: "#1C1D18" },
+  E: { fundo: "#a58f6f", texto: "#FFFFFF" },
+  F: { fundo: "#8d6b6b", texto: "#FFFFFF" },
+  X: { fundo: "#5c6b78", texto: "#FFFFFF" },
 };
 
 function ClasseSelo({ classe, nota, grande }: { classe: Classe; nota: number | null; grande?: boolean }) {
+  const cor = COR[classe];
   return (
     <span
-      className={`flex shrink-0 flex-col items-center justify-center rounded ${COR[classe]} ${
-        grande ? "h-14 w-14" : "h-9 w-9"
+      className={`flex shrink-0 items-center justify-center gap-1 rounded-full font-semibold ${
+        grande ? "h-10 px-4 text-base" : "h-6 px-2.5 text-xs"
       }`}
+      style={{ backgroundColor: cor.fundo, color: cor.texto }}
+      title={`Lead Score ${classe}${nota !== null ? ` · ${nota}` : ""}`}
     >
-      <span className={`num font-semibold leading-none ${grande ? "text-lg" : "text-xs"}`}>{classe}</span>
-      {nota !== null && (
-        <span className={`num leading-none opacity-80 ${grande ? "mt-1 text-xs" : "mt-0.5 text-[9px]"}`}>{nota}</span>
-      )}
+      <span className="num leading-none">{classe}</span>
+      {nota !== null && <span className="num leading-none opacity-80">{nota}</span>}
     </span>
   );
 }
