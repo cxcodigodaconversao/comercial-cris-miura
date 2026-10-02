@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { ChevronDown, Upload } from "lucide-react";
 import { supabase } from "@/lib/supabase/cliente";
 import { SELECT_ABORDAGEM, SELECT_INSCRITO } from "@/lib/consultas";
 import { fmtVal } from "@/lib/config";
 import { calcularAnalise, type Analise as Numeros, type Classe, type Contagem, type Inscrito } from "@/lib/analise";
-import { placarDeAbordagens } from "@/lib/participantes";
+import { abordagensPorMembro, resumoDias } from "@/lib/participantes";
 import type { Abordagem, Evento, Usuario, Venda } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Card, CardContent, Empty, SectionLabel } from "./ui/card";
@@ -77,6 +77,7 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
   }
 
   const a = useMemo(() => (inscritos ? calcularAnalise(inscritos, vendas) : null), [inscritos, vendas]);
+  const dias = useMemo(() => (inscritos ? resumoDias(inscritos) : null), [inscritos]);
 
   return (
     <>
@@ -158,6 +159,30 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
               <p className="mt-2 text-xs text-muted">
                 Aluno / não aluno só para quem respondeu no formulário. Os dias vêm do painel importado.
               </p>
+
+              {/* Frequência: % por dia (um presente conta em vários dias) e
+                  por combinação exata (cada um conta uma vez, soma 100%). */}
+              {dias && dias.comDia > 0 && (
+                <>
+                  <SectionLabel className="mt-4">Frequência por dia</SectionLabel>
+                  <div className="mt-2 flex gap-2">
+                    {dias.porDia.map((d) => (
+                      <Kpi key={d.dia} valor={`${d.pct}%`} rotulo={`Dia ${d.dia} · ${d.n}`} />
+                    ))}
+                  </div>
+                  <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+                    {dias.combinacoes.map((c) => (
+                      <BarraPct key={c.chave} rotulo={c.label} n={c.n} pct={c.pct} />
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted">
+                    % sobre {dias.comDia} presente{dias.comDia === 1 ? "" : "s"} com dia marcado. Por dia, quem veio
+                    em mais de um conta em cada; por combinação, cada pessoa conta uma vez (soma 100%).
+                    {dias.semDia > 0 &&
+                      ` ${dias.semDia} com check-in sem dia informado ficam de fora.`}
+                  </p>
+                </>
+              )}
               <SectionLabel className="mt-4">Funil de contato</SectionLabel>
               <div className="mt-2 flex gap-2">
                 <Kpi valor={String(a.funil.ligou)} rotulo="Ligou" />
@@ -173,7 +198,7 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
           <Bloco titulo="Tempo de formado(a)" itens={a.tempoFormado} />
           <Bloco titulo="Área de atuação" itens={a.area} limite={8} />
           <Bloco titulo="Faixa etária" itens={a.idade} />
-          <PlacarAbordagens abordagens={abordagens} />
+          <PlacarAbordagens abordagens={abordagens} inscritos={inscritos} />
           {isAdmin && <CardImportar />}
         </>
       )}
@@ -298,36 +323,108 @@ function Bloco({ titulo, itens, limite }: { titulo: string; itens: Contagem[]; l
   );
 }
 
+/** Barra de uma combinação de dias: largura = % dos presentes com dia. */
+function BarraPct({ rotulo, n, pct }: { rotulo: string; n: number; pct: number }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="w-20 shrink-0">{rotulo}</span>
+      <div className="h-3 flex-1 overflow-hidden rounded bg-border/40">
+        <div className="h-full rounded bg-accent/60" style={{ width: `${n > 0 ? Math.max(2, pct) : 0}%` }} />
+      </div>
+      <span className="num w-20 text-right text-xs">
+        {n} <span className="text-muted">· {pct}%</span>
+      </span>
+    </div>
+  );
+}
+
 /**
- * Quem abordou quantas pessoas. A contagem é de PESSOAS distintas, não de
- * registros: três conversas com a mesma lead são um trabalho de abordagem.
+ * Quem abordou quem, e o que foi conversado. Cada pessoa da equipe é uma
+ * linha que abre a lista das leads que ela abordou, com cada registro
+ * (data/hora e texto). A contagem é de PESSOAS distintas, não de registros:
+ * três conversas com a mesma lead são um trabalho de abordagem.
  */
-function PlacarAbordagens({ abordagens }: { abordagens: Abordagem[] }) {
-  const placar = placarDeAbordagens(abordagens);
-  if (!placar.length) return null;
-  const max = placar[0].pessoas;
+function PlacarAbordagens({ abordagens, inscritos }: { abordagens: Abordagem[]; inscritos: Inscrito[] }) {
+  const membros = abordagensPorMembro(abordagens, inscritos);
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
+  if (!membros.length) return null;
+  const max = membros[0].pessoas;
   const totalPessoas = new Set(abordagens.map((a) => a.email)).size;
+  const todosAbertos = abertos.size === membros.length;
+
+  function alternar(nome: string) {
+    setAbertos((atual) => {
+      const n = new Set(atual);
+      if (n.has(nome)) n.delete(nome);
+      else n.add(nome);
+      return n;
+    });
+  }
 
   return (
     <Card className="mb-3">
       <CardContent className="pt-4">
-        <SectionLabel>Abordagens por pessoa</SectionLabel>
-        <div className="mt-2 space-y-1.5">
-          {placar.map((p) => (
-            <div key={p.nome} className="flex items-center gap-2 text-sm">
-              <span className="w-[32%] truncate" title={p.nome}>{p.nome}</span>
-              <div className="h-3 flex-1 overflow-hidden rounded bg-border/40">
-                <div className="h-full rounded bg-accent/60" style={{ width: `${Math.max(2, Math.round((p.pessoas / max) * 100))}%` }} />
+        <div className="flex items-center justify-between gap-2">
+          <SectionLabel>Abordagens por pessoa</SectionLabel>
+          <button
+            type="button"
+            onClick={() => setAbertos(todosAbertos ? new Set() : new Set(membros.map((m) => m.nome)))}
+            className="text-xs text-muted-foreground underline underline-offset-2"
+          >
+            {todosAbertos ? "Fechar todos" : "Abrir todos"}
+          </button>
+        </div>
+        <div className="mt-2 divide-y divide-border">
+          {membros.map((m) => {
+            const aberto = abertos.has(m.nome);
+            return (
+              <div key={m.nome} className="py-2">
+                <button
+                  type="button"
+                  aria-expanded={aberto}
+                  onClick={() => alternar(m.nome)}
+                  className="flex w-full items-center gap-2 text-left text-sm"
+                >
+                  <span className="w-[32%] truncate font-medium" title={m.nome}>{m.nome}</span>
+                  <div className="h-3 flex-1 overflow-hidden rounded bg-border/40">
+                    <div className="h-full rounded bg-accent/60" style={{ width: `${Math.max(2, Math.round((m.pessoas / max) * 100))}%` }} />
+                  </div>
+                  <span className="num w-24 text-right text-xs">
+                    {m.pessoas} pessoa{m.pessoas === 1 ? "" : "s"}
+                  </span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
+                </button>
+                {aberto && (
+                  <div className="mt-2 space-y-2">
+                    {m.leads.map((l) => (
+                      <div key={l.email} className="rounded-md border border-border bg-background/60 p-2.5">
+                        <p className="flex items-baseline justify-between gap-2 text-sm">
+                          <span className="min-w-0 truncate font-medium">{l.nome}</span>
+                          {l.classe && <span className="num shrink-0 text-xs text-muted">{l.classe}</span>}
+                        </p>
+                        {l.nome !== l.email && <p className="num truncate text-[11px] text-muted">{l.email}</p>}
+                        <div className="mt-1.5 space-y-1.5">
+                          {l.registros.map((r) => (
+                            <div key={r.id} className="border-l-2 border-accent/50 pl-2">
+                              <p className="num text-[11px] text-muted">
+                                {new Date(r.em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                              </p>
+                              <p className="whitespace-pre-wrap text-sm">{r.observacao || "(sem texto)"}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <span className="num w-24 text-right text-xs">
-                {p.pessoas} pessoa{p.pessoas === 1 ? "" : "s"}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <p className="mt-2 text-xs text-muted">
           {totalPessoas} participante{totalPessoas === 1 ? "" : "s"} abordado{totalPessoas === 1 ? "" : "s"} ·{" "}
-          {abordagens.length} registro{abordagens.length === 1 ? "" : "s"}. Repetir a mesma lead conta uma vez.
+          {abordagens.length} registro{abordagens.length === 1 ? "" : "s"}. Toque no nome para ver as leads e as
+          conversas. Repetir a mesma lead conta uma vez.
         </p>
       </CardContent>
     </Card>

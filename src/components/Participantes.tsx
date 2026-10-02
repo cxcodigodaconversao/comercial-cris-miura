@@ -8,12 +8,15 @@ import { fmtVal } from "@/lib/config";
 import { CLASSES, normalizarEmail, type Classe, type Inscrito } from "@/lib/analise";
 import {
   abordagensPorEmail,
+  COMBINACOES,
   contarPorClasse,
+  contarPorDia,
   detalhesDe,
   ehAluno,
   ehNaoAluno,
   filtrarAluno,
   filtrarClasse,
+  filtrarDia,
   filtrarParticipantes,
   filtrarPresenca,
   linkInstagram,
@@ -22,6 +25,7 @@ import {
   resumoPresenca,
   rotulosPresenca,
   type FiltroAluno,
+  type FiltroDia,
   type FiltroPresenca,
 } from "@/lib/participantes";
 import type { Abordagem, Evento, Usuario, Venda } from "@/lib/types";
@@ -48,6 +52,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
   const [termo, setTermo] = useState("");
   const [presenca, setPresenca] = useState<FiltroPresenca>("todos");
   const [aluno, setAluno] = useState<FiltroAluno>("todos");
+  const [dia, setDia] = useState<FiltroDia>("todos");
   const [classes, setClasses] = useState<Set<Classe>>(new Set());
   const [aberto, setAberto] = useState<Inscrito | null>(null);
   const [abordagens, setAbordagens] = useState<Abordagem[]>([]);
@@ -58,6 +63,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     setTermo("");
     setPresenca("todos");
     setAluno("todos");
+    setDia("todos");
     setClasses(new Set());
     (async () => {
       const { data, error } = await supabase
@@ -112,10 +118,13 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     () =>
       inscritos
         ? ordenarParticipantes(
-            filtrarClasse(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), classes)
+            filtrarClasse(
+              filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia),
+              classes
+            )
           )
         : [],
-    [inscritos, termo, presenca, aluno, classes]
+    [inscritos, termo, presenca, aluno, dia, classes]
   );
 
   /** Contagem por classe respeitando os OUTROS filtros (busca, presença,
@@ -123,10 +132,23 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
   const porClasse = useMemo(
     () =>
       contarPorClasse(
-        inscritos ? filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno) : []
+        inscritos
+          ? filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia)
+          : []
       ),
-    [inscritos, termo, presenca, aluno]
+    [inscritos, termo, presenca, aluno, dia]
   );
+
+  /** Mesma ideia para os chips de dia: respeitam busca, aluno e classe. */
+  const porDia = useMemo(
+    () =>
+      contarPorDia(
+        inscritos ? filtrarClasse(filtrarAluno(filtrarParticipantes(inscritos, termo), aluno), classes) : []
+      ),
+    [inscritos, termo, aluno, classes]
+  );
+  /** Base das porcentagens dos chips: presentes com dia marcado. */
+  const comDia = COMBINACOES.reduce((s, c) => s + porDia[c.chave], 0);
 
   function alternarClasse(c: Classe) {
     setClasses((atual) => {
@@ -139,7 +161,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
 
   /** Contadores dos chips: presentes vêm do painel importado, não do app. */
   const resumo = useMemo(() => (inscritos ? resumoPresenca(inscritos) : null), [inscritos]);
-  const filtrando = Boolean(termo) || presenca !== "todos" || aluno !== "todos" || classes.size > 0;
+  const filtrando = Boolean(termo) || presenca !== "todos" || aluno !== "todos" || dia !== "todos" || classes.size > 0;
 
   if (inscritos === null) return <Empty>Carregando…</Empty>;
   if (!inscritos.length) {
@@ -191,6 +213,29 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
                 { valor: "alunos", label: "Alunos" },
                 { valor: "nao_alunos", label: "Não alunos" },
               ]}
+            />
+          </div>
+          {/* Dias: "esteve no dia" (qualquer combinação) na primeira linha,
+              combinação EXATA na segunda. Um só filtro ativo por vez; tocar
+              de novo no ativo volta para todos. % = dos presentes com dia. */}
+          <div className="mt-3 space-y-1.5">
+            <DiaChips
+              valor={dia}
+              onChange={setDia}
+              opcoes={[
+                { valor: "d1", label: "1º dia" },
+                { valor: "d2", label: "2º dia" },
+                { valor: "d3", label: "3º dia" },
+              ]}
+              contagem={porDia}
+              base={comDia}
+            />
+            <DiaChips
+              valor={dia}
+              onChange={setDia}
+              opcoes={COMBINACOES.map((c) => ({ valor: c.chave, label: c.label }))}
+              contagem={porDia}
+              base={comDia}
             />
           </div>
           {/* Lead Score: filtro e legenda ao mesmo tempo. Cores do painel;
@@ -470,6 +515,49 @@ function Ficha({
 }
 
 // ── Peças ──────────────────────────────────────────────────────────────
+
+/** Chips de dia: número e % no próprio chip; tocar no ativo desliga. */
+function DiaChips({
+  valor,
+  onChange,
+  opcoes,
+  contagem,
+  base,
+}: {
+  valor: FiltroDia;
+  onChange: (v: FiltroDia) => void;
+  opcoes: { valor: FiltroDia; label: string }[];
+  contagem: Record<FiltroDia, number>;
+  base: number;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {opcoes.map((o) => {
+        const ativo = o.valor === valor;
+        const n = contagem[o.valor];
+        return (
+          <button
+            key={o.valor}
+            type="button"
+            aria-pressed={ativo}
+            onClick={() => onChange(ativo ? "todos" : o.valor)}
+            className={`h-7 rounded-full border px-2.5 text-xs font-medium transition-colors ${
+              ativo
+                ? "border-foreground bg-foreground text-background"
+                : "border-border-strong bg-card text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {o.label}
+            <span className="num ml-1 font-normal opacity-80">
+              {n}
+              {base > 0 ? ` · ${Math.round((n / base) * 100)}%` : ""}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /** Grupo de chips exclusivos (um selecionado por vez), tamanho de toque. */
 function Chips<T extends string>({

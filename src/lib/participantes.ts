@@ -131,6 +131,86 @@ export function resumoPresenca(lista: Inscrito[]): ResumoPresenca {
   });
   return { presentes: presentes.length, ...abrir(presentes), porDia };
 }
+
+// ── Filtro e resumo por dia ─────────────────────────────────────────────
+//
+// Dois jeitos de olhar o mesmo dado, e o time pede os dois:
+//   · "esteve no 1º dia" (d1, d2, d3) — quem passou naquele dia, tenha ido
+//     ou não aos outros;
+//   · a combinação EXATA de dias ("só 1º", "1º e 2º", "os 3") — cada
+//     presente cai em uma e só uma, então as porcentagens somam 100%.
+
+export type FiltroDia = "todos" | "d1" | "d2" | "d3" | CombinacaoDias;
+export type CombinacaoDias = "so1" | "so2" | "so3" | "d12" | "d23" | "d13" | "d123";
+
+export const COMBINACOES: { chave: CombinacaoDias; label: string; dias: number[] }[] = [
+  { chave: "so1", label: "Só 1º dia", dias: [1] },
+  { chave: "so2", label: "Só 2º dia", dias: [2] },
+  { chave: "so3", label: "Só 3º dia", dias: [3] },
+  { chave: "d12", label: "1º e 2º", dias: [1, 2] },
+  { chave: "d23", label: "2º e 3º", dias: [2, 3] },
+  { chave: "d13", label: "1º e 3º", dias: [1, 3] },
+  { chave: "d123", label: "Os 3 dias", dias: [1, 2, 3] },
+];
+
+/** A combinação exata de dias da pessoa, ou null se não tem dia marcado. */
+export function combinacaoDias(i: Inscrito): CombinacaoDias | null {
+  const dias = diasPresentes(i).join(",");
+  return COMBINACOES.find((c) => c.dias.join(",") === dias)?.chave ?? null;
+}
+
+export function filtrarDia(lista: Inscrito[], filtro: FiltroDia): Inscrito[] {
+  if (filtro === "todos") return lista;
+  if (filtro === "d1" || filtro === "d2" || filtro === "d3") {
+    const dia = Number(filtro[1]);
+    return lista.filter((i) => diasPresentes(i).includes(dia));
+  }
+  return lista.filter((i) => combinacaoDias(i) === filtro);
+}
+
+/** Quantos passam em cada filtro de dia — o número que vai no chip. */
+export function contarPorDia(lista: Inscrito[]): Record<FiltroDia, number> {
+  const c = { todos: lista.length, d1: 0, d2: 0, d3: 0 } as Record<FiltroDia, number>;
+  for (const k of COMBINACOES) c[k.chave] = 0;
+  for (const i of lista) {
+    for (const d of diasPresentes(i)) c[`d${d}` as "d1" | "d2" | "d3"]++;
+    const k = combinacaoDias(i);
+    if (k) c[k]++;
+  }
+  return c;
+}
+
+export type LinhaCombinacao = { chave: CombinacaoDias; label: string; n: number; pct: number };
+
+export type ResumoDias = {
+  /** Presentes com pelo menos um dia marcado — a base das porcentagens. */
+  comDia: number;
+  /** Fez check-in mas o painel não trouxe o dia: fora das porcentagens. */
+  semDia: number;
+  porDia: { dia: number; n: number; pct: number }[];
+  combinacoes: LinhaCombinacao[];
+};
+
+/**
+ * Porcentagens de presença por dia e por combinação de dias, sobre os
+ * presentes com dia marcado. Por dia, um mesmo presente conta em vários
+ * (não soma 100%); por combinação, cada um conta uma vez (soma 100%).
+ */
+export function resumoDias(lista: Inscrito[]): ResumoDias {
+  const c = contarPorDia(lista);
+  const comDia = lista.filter((i) => diasPresentes(i).length > 0).length;
+  const semDia = lista.filter((i) => i.checkinFeito && diasPresentes(i).length === 0).length;
+  const pct = (n: number) => (comDia ? Math.round((n / comDia) * 1000) / 10 : 0);
+  return {
+    comDia,
+    semDia,
+    porDia: [1, 2, 3].map((dia) => {
+      const n = c[`d${dia}` as "d1" | "d2" | "d3"];
+      return { dia, n, pct: pct(n) };
+    }),
+    combinacoes: COMBINACOES.map(({ chave, label }) => ({ chave, label, n: c[chave], pct: pct(c[chave]) })),
+  };
+}
 /** `https://wa.me/55...` ou null se o número não for utilizável. */
 export function linkWhatsapp(whatsapp: string | null): string | null {
   let d = digitos(whatsapp);
@@ -225,6 +305,40 @@ export function placarDeAbordagens(abordagens: Abordagem[]): PlacarAbordagem[] {
   return [...porPessoa.entries()]
     .map(([nome, v]) => ({ nome, pessoas: v.emails.size, registros: v.registros }))
     .sort((a, b) => b.pessoas - a.pessoas || a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+export type LeadAbordada = {
+  email: string;
+  /** Nome do inscrito na base; cai para o e-mail se não estiver lá. */
+  nome: string;
+  classe: Classe | null;
+  /** Registros dessa pessoa da equipe com essa lead, mais recente primeiro. */
+  registros: Abordagem[];
+};
+
+export type AbordagensDaPessoa = PlacarAbordagem & { leads: LeadAbordada[] };
+
+/**
+ * O placar aberto: para cada pessoa da equipe, as leads que ela abordou e
+ * o que foi conversado em cada registro. Leads com conversa mais recente
+ * primeiro, para quem abre ver o que acabou de acontecer no salão.
+ */
+export function abordagensPorMembro(abordagens: Abordagem[], inscritos: Inscrito[]): AbordagensDaPessoa[] {
+  const base = new Map(inscritos.map((i) => [i.email, i]));
+  const porMembro = new Map<string, Map<string, Abordagem[]>>();
+  for (const a of [...abordagens].sort((x, y) => y.em.localeCompare(x.em))) {
+    const nome = a.porNome?.trim() || "(sem nome)";
+    const leads = porMembro.get(nome) ?? new Map<string, Abordagem[]>();
+    leads.set(a.email, [...(leads.get(a.email) ?? []), a]);
+    porMembro.set(nome, leads);
+  }
+  return placarDeAbordagens(abordagens).map((p) => ({
+    ...p,
+    leads: [...(porMembro.get(p.nome) ?? new Map<string, Abordagem[]>()).entries()].map(([email, registros]) => {
+      const i = base.get(email);
+      return { email, nome: i?.nome || email, classe: i?.classe ?? null, registros };
+    }),
+  }));
 }
 
 /** Agrupa por e-mail do inscrito, mais recente primeiro. */

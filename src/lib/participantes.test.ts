@@ -3,6 +3,9 @@ import { normalizarLinha } from "./analise";
 import type { Abordagem } from "./types";
 import {
   abordagensPorEmail,
+  abordagensPorMembro,
+  filtrarDia,
+  resumoDias,
   contarPorClasse,
   filtrarClasse,
   detalhesDe,
@@ -220,5 +223,68 @@ describe("abordagensPorEmail", () => {
     ]);
     expect(m.get("a@x")!.map((a) => a.porNome)).toEqual(["Mila", "Bruna"]);
     expect(m.get("b@x")).toHaveLength(1);
+  });
+});
+
+describe("filtro e resumo por dia", () => {
+  const lista = [
+    p({ email: "a@x", checkin_feito: true, d1: true, d2: false, d3: false }),
+    p({ email: "b@x", checkin_feito: true, d1: true, d2: true, d3: false }),
+    p({ email: "c@x", checkin_feito: true, d1: false, d2: true, d3: true }),
+    p({ email: "d@x", checkin_feito: true, d1: true, d2: true, d3: true }),
+    p({ email: "e@x", checkin_feito: false, d1: false, d2: false, d3: true }),
+    p({ email: "f@x", checkin_feito: true, d1: false, d2: false, d3: false }),
+    p({ email: "g@x", checkin_feito: false, d1: false, d2: false, d3: false }),
+  ];
+  const emails = (l: { email: string }[]) => l.map((i) => i.email);
+
+  it("'esteve no dia' traz quem passou naquele dia, qualquer combinação", () => {
+    expect(emails(filtrarDia(lista, "d1"))).toEqual(["a@x", "b@x", "d@x"]);
+    expect(emails(filtrarDia(lista, "d3"))).toEqual(["c@x", "d@x", "e@x"]);
+  });
+
+  it("combinação é exata", () => {
+    expect(emails(filtrarDia(lista, "so1"))).toEqual(["a@x"]);
+    expect(emails(filtrarDia(lista, "so3"))).toEqual(["e@x"]);
+    expect(emails(filtrarDia(lista, "d12"))).toEqual(["b@x"]);
+    expect(emails(filtrarDia(lista, "d23"))).toEqual(["c@x"]);
+    expect(emails(filtrarDia(lista, "d123"))).toEqual(["d@x"]);
+    expect(filtrarDia(lista, "todos")).toHaveLength(7);
+  });
+
+  it("porcentagens sobre quem tem dia; combinações somam 100%", () => {
+    const r = resumoDias(lista);
+    expect(r.comDia).toBe(5);
+    expect(r.semDia).toBe(1);
+    expect(r.porDia.map((d) => d.n)).toEqual([3, 3, 3]);
+    expect(r.porDia[0].pct).toBe(60);
+    const so1 = r.combinacoes.find((c) => c.chave === "so1")!;
+    expect(so1).toMatchObject({ n: 1, pct: 20 });
+    expect(r.combinacoes.reduce((s, c) => s + c.n, 0)).toBe(5);
+    expect(r.combinacoes.reduce((s, c) => s + c.pct, 0)).toBeCloseTo(100);
+  });
+});
+
+describe("abordagensPorMembro", () => {
+  const ab = (id: string, email: string, porNome: string, em: string, observacao = "obs " + id): Abordagem => ({
+    id, email, usuarioId: null, porNome, observacao, em,
+  });
+  const inscritos = [p({ email: "lead1@x", nome: "Lead Um" }), p({ email: "lead2@x", nome: "Lead Dois", classe: "B" })];
+
+  it("abre cada membro em leads e conversas, mais recentes primeiro", () => {
+    const r = abordagensPorMembro(
+      [
+        ab("1", "lead1@x", "Bruna", "2026-10-01T10:00:00Z"),
+        ab("2", "lead2@x", "Bruna", "2026-10-01T12:00:00Z"),
+        ab("3", "lead1@x", "Bruna", "2026-10-02T09:00:00Z"),
+        ab("4", "fora@x", "Carlos", "2026-10-01T11:00:00Z"),
+      ],
+      inscritos
+    );
+    expect(r.map((m) => m.nome)).toEqual(["Bruna", "Carlos"]);
+    expect(r[0].leads.map((l) => l.nome)).toEqual(["Lead Um", "Lead Dois"]);
+    expect(r[0].leads[0].registros.map((a) => a.id)).toEqual(["3", "1"]);
+    expect(r[0].leads[1].classe).toBe("B");
+    expect(r[1].leads[0]).toMatchObject({ nome: "fora@x", classe: null });
   });
 });
