@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ErroApi, autenticar, responderErro } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { extrairInscritosDoPainel, type Inscrito } from "@/lib/analise";
+import { preservarCloserManual } from "@/lib/participantes";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -43,6 +44,21 @@ export async function POST(req: NextRequest) {
       throw new ErroApi(400, (e as Error).message);
     }
     if (!inscritos.length) throw new ErroApi(400, "Nenhum inscrito com e-mail no arquivo.");
+
+    // Closer cadastrado à mão no app sobrevive à troca do painel.
+    const antigos: { email: string; extras: Record<string, unknown> | null }[] = [];
+    for (let de = 0; ; de += 1000) {
+      const { data: lote, error } = await admin
+        .from("inscritos")
+        .select("email, extras")
+        .eq("evento_id", eventoId)
+        .order("email")
+        .range(de, de + 999);
+      if (error) throw new ErroApi(500, "Falha ao ler a base anterior: " + error.message);
+      antigos.push(...((lote ?? []) as typeof antigos));
+      if (!lote || lote.length < 1000) break;
+    }
+    inscritos = preservarCloserManual(inscritos, antigos);
 
     const linhas = inscritos.map((i) => ({
       evento_id: eventoId,

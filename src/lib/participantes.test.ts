@@ -27,6 +27,10 @@ import {
   SEM_CLOSER,
   resumoPorCloser,
   closerDoUsuario,
+  closerDoPainel,
+  closerManual,
+  opcoesDeCloser,
+  preservarCloserManual,
 } from "./participantes";
 
 const p = (over: Record<string, unknown> = {}) =>
@@ -321,9 +325,6 @@ describe("closer responsável", () => {
       { closer: "Gabriel", n: 1 },
     ]);
   });
-  it("aparece na ficha", () => {
-    expect(detalhesDe(lista[0])).toContainEqual({ label: "Closer responsável", valor: "Mila" });
-  });
 });
 
 describe("resumoPorCloser", () => {
@@ -350,5 +351,41 @@ describe("closerDoUsuario", () => {
     expect(closerDoUsuario("Mila Pinheiro", ["Mila", "Bruna"])).toBe("Mila");
     expect(closerDoUsuario("BRUNA valadares", ["Mila", "Bruna"])).toBe("Bruna");
     expect(closerDoUsuario("Everton Rodrigues", ["Mila", "Bruna"])).toBeNull();
+  });
+});
+
+describe("closer cadastrado no app", () => {
+  it("painel vence; sem painel vale o manual", () => {
+    const soManual = p({ email: "a@x", closer_manual: "Gabriel" });
+    const osDois = p({ email: "b@x", closer: "Mila", closer_manual: "Gabriel" });
+    expect(closerDe(soManual)).toBe("Gabriel");
+    expect(closerDoPainel(soManual)).toBeNull();
+    expect(closerManual(soManual)).toBe("Gabriel");
+    expect(closerDe(osDois)).toBe("Mila");
+    expect(filtrarCloser([soManual, osDois], SEM_CLOSER)).toHaveLength(0);
+  });
+  it("reimportar o painel mantém o closer manual por e-mail", () => {
+    const novos = [
+      { email: "a@x", extras: { cro: "1" } },
+      { email: "b@x", extras: {} },
+    ];
+    const antigos = [
+      { email: "a@x", extras: { closer_manual: "Bruna" } },
+      { email: "z@x", extras: { closer_manual: "Mila" } },
+      { email: "b@x", extras: null },
+    ];
+    expect(preservarCloserManual(novos, antigos)).toEqual([
+      { email: "a@x", extras: { cro: "1", closer_manual: "Bruna" } },
+      { email: "b@x", extras: {} },
+    ]);
+  });
+  it("opções: closers da base + usuários closers que faltam", () => {
+    const lista = [p({ email: "a@x", closer: "Mila" }), p({ email: "b@x", closer: "Bruna" })];
+    expect(opcoesDeCloser(lista, ["Mila Pinheiro", "Zeca Lima", "Ana Souza", "Zeca Lima"])).toEqual([
+      "Bruna",
+      "Mila",
+      "Ana Souza",
+      "Zeca Lima",
+    ]);
   });
 });

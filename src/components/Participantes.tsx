@@ -9,7 +9,9 @@ import { CLASSES, normalizarEmail, type Classe, type Inscrito } from "@/lib/anal
 import {
   abordagensPorEmail,
   closerDe,
+  closerDoPainel,
   closerDoUsuario,
+  closerManual,
   COMBINACOES,
   contarPorCloser,
   contarPorClasse,
@@ -25,6 +27,7 @@ import {
   filtrarPresenca,
   linkInstagram,
   linkWhatsapp,
+  opcoesDeCloser,
   ordenarParticipantes,
   resumoPresenca,
   rotulosPresenca,
@@ -34,10 +37,11 @@ import {
   type FiltroPresenca,
 } from "@/lib/participantes";
 import type { Abordagem, Evento, Usuario, Venda } from "@/lib/types";
+import { useUsuarios } from "@/lib/useUsuarios";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, Empty, SectionLabel } from "./ui/card";
-import { Field, Input, Textarea } from "./ui/field";
+import { Field, Input, Select, Textarea } from "./ui/field";
 import { useFeedback } from "./ui/feedback";
 
 /**
@@ -127,6 +131,41 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     toast("sucesso", "Abordagem registrada.");
     return true;
   }
+
+  /** Cadastra o closer de uma lead que o painel trouxe sem closer. Vai pela
+   *  API (a tabela não aceita escrita direta) e atualiza a tela na hora. */
+  async function definirCloser(email: string, nome: string) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Sessão expirada. Entre novamente.");
+      const res = await fetch("/api/inscritos/closer", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId: evento.id, email, closer: nome }),
+      });
+      const corpo = await res.json();
+      if (!res.ok) throw new Error(corpo.error || `Erro ${res.status}.`);
+      const extras = corpo.extras as Inscrito["extras"];
+      setInscritos((l) => (l ? l.map((i) => (i.email === email ? { ...i, extras } : i)) : l));
+      setAberto((a) => (a && a.email === email ? { ...a, extras } : a));
+      toast("sucesso", nome ? `Closer definido: ${nome}.` : "Closer removido.");
+      return true;
+    } catch (e) {
+      toast("erro", "Não foi possível salvar o closer.", (e as Error).message);
+      return false;
+    }
+  }
+
+  const { usuarios } = useUsuarios();
+  const opcoesCloser = useMemo(
+    () =>
+      opcoesDeCloser(
+        inscritos ?? [],
+        usuarios.filter((u) => u.ativo && u.papel === "closer").map((u) => u.nome)
+      ),
+    [inscritos, usuarios]
+  );
 
   const lista = useMemo(
     () =>
@@ -226,6 +265,9 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
         vendas={compradores.get(aberto.email) ?? []}
         abordagens={porEmail.get(aberto.email) ?? []}
         onRegistrar={(obs) => registrarAbordagem(aberto.email, obs)}
+        opcoesCloser={opcoesCloser}
+        podeDefinirCloser={perfil.papel !== "promotor"}
+        onDefinirCloser={(nome) => definirCloser(aberto.email, nome)}
         onVoltar={() => setAberto(null)}
       />
     );
@@ -469,14 +511,34 @@ function Ficha({
   vendas,
   abordagens,
   onRegistrar,
+  opcoesCloser,
+  podeDefinirCloser,
+  onDefinirCloser,
   onVoltar,
 }: {
   inscrito: Inscrito;
   vendas: Venda[];
   abordagens: Abordagem[];
   onRegistrar: (observacao: string) => Promise<boolean>;
+  opcoesCloser: string[];
+  podeDefinirCloser: boolean;
+  onDefinirCloser: (nome: string) => Promise<boolean>;
   onVoltar: () => void;
 }) {
+  const doPainel = closerDoPainel(i);
+  const manual = closerManual(i);
+  const [escolha, setEscolha] = useState(manual ?? "");
+  const [salvandoCloser, setSalvandoCloser] = useState(false);
+  useEffect(() => setEscolha(manual ?? ""), [manual, i.email]);
+  // Se o nome salvo não está mais entre as opções, continua selecionável.
+  const opcoes = manual && !opcoesCloser.includes(manual) ? [...opcoesCloser, manual] : opcoesCloser;
+
+  async function salvarCloser() {
+    setSalvandoCloser(true);
+    await onDefinirCloser(escolha);
+    setSalvandoCloser(false);
+  }
+
   const wa = linkWhatsapp(i.whatsapp);
   const ig = linkInstagram(i.extras.instagram);
   const detalhes = detalhesDe(i);
@@ -520,6 +582,47 @@ function Ficha({
                 </Button>
               )}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Closer responsável: o que veio da planilha só é mostrado; lead sem
+          closer pode ganhar um aqui, e a escolha vale para o time todo. */}
+      <Card className="mb-3">
+        <CardContent className="pt-4">
+          <SectionLabel>Closer responsável</SectionLabel>
+          {doPainel ? (
+            <p className="mt-1 text-sm">
+              <span className="font-medium">{doPainel}</span>
+              <span className="text-xs text-muted"> · definido na planilha de confirmados</span>
+            </p>
+          ) : podeDefinirCloser ? (
+            <>
+              <div className="mt-2 flex gap-2">
+                <Select value={escolha} onChange={(e) => setEscolha(e.target.value)} aria-label="Closer responsável">
+                  <option value="">Sem closer</option>
+                  {opcoes.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </Select>
+                <Button
+                  variant="accent"
+                  disabled={salvandoCloser || escolha === (manual ?? "")}
+                  onClick={salvarCloser}
+                >
+                  {salvandoCloser ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+              <p className="mt-1.5 text-xs text-muted">
+                {manual
+                  ? `Cadastrado no app${i.extras.closer_manual_por ? ` por ${String(i.extras.closer_manual_por)}` : ""}. Vale para o time todo e continua valendo quando o painel for atualizado.`
+                  : "Esta lead veio sem closer. Escolha um nome e toque em Salvar."}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">{manual ?? "Sem closer"}</p>
           )}
         </CardContent>
       </Card>
