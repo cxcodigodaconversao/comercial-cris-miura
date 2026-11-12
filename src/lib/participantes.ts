@@ -280,6 +280,39 @@ export function contarPorCloser(lista: Inscrito[]): { closer: string; n: number 
     .sort((a, b) => b.n - a.n || a.closer.localeCompare(b.closer, "pt-BR"));
 }
 
+export type LinhaCloser = {
+  closer: string;
+  semCloser: boolean;
+  leads: number;
+  presentes: number;
+  mql: number;
+  mqlPresentes: number;
+};
+
+/**
+ * Divisão da base por closer para a aba Análise: leads, presentes, MQL
+ * (AA+A+B) e MQL presentes de cada um, com "Sem closer" por último.
+ * Painel sem closer nenhum → lista vazia (o card não aparece).
+ */
+export function resumoPorCloser(lista: Inscrito[]): LinhaCloser[] {
+  if (!lista.some((i) => closerDe(i))) return [];
+  const linha = (closer: string, semCloser: boolean, g: Inscrito[]): LinhaCloser => {
+    const mql = g.filter((i) => i.classe === "AA" || i.classe === "A" || i.classe === "B");
+    return {
+      closer,
+      semCloser,
+      leads: g.length,
+      presentes: g.filter(estaPresente).length,
+      mql: mql.length,
+      mqlPresentes: mql.filter(estaPresente).length,
+    };
+  };
+  const saida = contarPorCloser(lista).map((c) => linha(c.closer, false, filtrarCloser(lista, c.closer)));
+  const sem = filtrarCloser(lista, SEM_CLOSER);
+  if (sem.length) saida.push(linha("Sem closer", true, sem));
+  return saida;
+}
+
 // ── Detalhe: os campos "soltos" que vieram do painel ────────────────────
 
 /**

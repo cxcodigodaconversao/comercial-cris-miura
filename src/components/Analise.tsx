@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/cliente";
 import { SELECT_ABORDAGEM, SELECT_INSCRITO } from "@/lib/consultas";
 import { fmtVal } from "@/lib/config";
 import { calcularAnalise, type Analise as Numeros, type Classe, type Contagem, type Inscrito } from "@/lib/analise";
-import { abordagensPorMembro, resumoDias } from "@/lib/participantes";
+import { abordagensPorMembro, resumoDias, resumoPorCloser } from "@/lib/participantes";
 import type { Abordagem, Evento, Usuario, Venda } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Card, CardContent, Empty, SectionLabel } from "./ui/card";
@@ -78,6 +78,7 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
 
   const a = useMemo(() => (inscritos ? calcularAnalise(inscritos, vendas) : null), [inscritos, vendas]);
   const dias = useMemo(() => (inscritos ? resumoDias(inscritos) : null), [inscritos]);
+  const closers = useMemo(() => (inscritos ? resumoPorCloser(inscritos) : []), [inscritos]);
 
   return (
     <>
@@ -130,6 +131,48 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
               <p className="mt-2 text-xs text-muted">X = não respondeu o formulário de perfil. À direita: vendas e conversão da classe.</p>
             </CardContent>
           </Card>
+
+          {/* ── Divisão por closer ───────────────────────────────────── */}
+          {closers.length > 0 && (
+            <Card className="mb-3">
+              <CardContent className="pt-4">
+                <SectionLabel>Divisão por closer</SectionLabel>
+                <div className="mt-2 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-muted-foreground">
+                        <th className="py-1.5 pr-2 font-medium">Closer</th>
+                        <th className="py-1.5 px-2 text-right font-medium">Leads</th>
+                        <th className="py-1.5 px-2 text-right font-medium">Presentes</th>
+                        <th className="py-1.5 px-2 text-right font-medium">MQL</th>
+                        <th className="py-1.5 pl-2 text-right font-medium">MQL presentes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {closers.map((c) => (
+                        <tr key={c.closer} className={c.semCloser ? "text-muted-foreground" : ""}>
+                          <td className="py-2 pr-2 font-medium">{c.closer}</td>
+                          <td className="num py-2 px-2 text-right">{c.leads}</td>
+                          <td className="num py-2 px-2 text-right">
+                            {c.presentes}
+                            <span className="ml-1 text-xs text-muted">
+                              {c.leads ? Math.round((100 * c.presentes) / c.leads) : 0}%
+                            </span>
+                          </td>
+                          <td className="num py-2 px-2 text-right">{c.mql}</td>
+                          <td className="num py-2 pl-2 text-right">{c.mqlPresentes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  Closer = quem confirmou a lead (planilha do Clint, vem no painel importado). MQL = AA+A+B. Para ver
+                  os nomes, use o filtro “Closer” na aba Participantes.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* ── Presença e contato ───────────────────────────────────── */}
           <Card className="mb-3">

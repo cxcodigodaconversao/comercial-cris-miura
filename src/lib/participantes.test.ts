@@ -25,6 +25,7 @@ import {
   contarPorCloser,
   filtrarCloser,
   SEM_CLOSER,
+  resumoPorCloser,
 } from "./participantes";
 
 const p = (over: Record<string, unknown> = {}) =>
@@ -321,5 +322,24 @@ describe("closer responsável", () => {
   });
   it("aparece na ficha", () => {
     expect(detalhesDe(lista[0])).toContainEqual({ label: "Closer responsável", valor: "Mila" });
+  });
+});
+
+describe("resumoPorCloser", () => {
+  it("leads, presentes e MQL por closer, sem closer por último", () => {
+    const lista = [
+      p({ email: "a@x", closer: "Mila", classe: "AA", checkin_feito: true }),
+      p({ email: "b@x", closer: "Mila", classe: "D" }),
+      p({ email: "c@x", closer: "Bruna", classe: "B", d1: true }),
+      p({ email: "d@x", classe: "X", nota: null, checkin_feito: true }),
+    ];
+    expect(resumoPorCloser(lista)).toEqual([
+      { closer: "Mila", semCloser: false, leads: 2, presentes: 1, mql: 1, mqlPresentes: 1 },
+      { closer: "Bruna", semCloser: false, leads: 1, presentes: 1, mql: 1, mqlPresentes: 1 },
+      { closer: "Sem closer", semCloser: true, leads: 1, presentes: 1, mql: 0, mqlPresentes: 0 },
+    ]);
+  });
+  it("painel sem closer → vazio", () => {
+    expect(resumoPorCloser([p({ email: "a@x" })])).toEqual([]);
   });
 });
