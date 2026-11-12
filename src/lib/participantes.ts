@@ -245,6 +245,41 @@ export function ordenarParticipantes(lista: Inscrito[]): Inscrito[] {
   );
 }
 
+// ── Closer responsável ──────────────────────────────────────────────────
+//
+// O painel traz o closer de cada lead em `extras.closer` (no IMA Brasília
+// vem da coluna "Quem confirmou" da planilha de confirmados do Clint).
+// Painéis mais antigos não têm o campo: aí o filtro nem aparece.
+
+/** Nome do closer responsável pela lead, ou null se o painel não trouxe. */
+export function closerDe(i: Inscrito): string | null {
+  const v = i.extras.closer ?? i.extras.quem_confirmou;
+  const s = typeof v === "string" ? v.trim() : "";
+  return s || null;
+}
+
+/** "todos", "sem" (leads sem closer) ou o nome de um closer. */
+export type FiltroCloser = string;
+export const SEM_CLOSER = "__sem__";
+
+export function filtrarCloser(lista: Inscrito[], filtro: FiltroCloser): Inscrito[] {
+  if (!filtro || filtro === "todos") return lista;
+  if (filtro === SEM_CLOSER) return lista.filter((i) => !closerDe(i));
+  return lista.filter((i) => closerDe(i) === filtro);
+}
+
+/** Closers presentes na lista, com quantas leads cada um tem (maior primeiro). */
+export function contarPorCloser(lista: Inscrito[]): { closer: string; n: number }[] {
+  const m = new Map<string, number>();
+  for (const i of lista) {
+    const c = closerDe(i);
+    if (c) m.set(c, (m.get(c) ?? 0) + 1);
+  }
+  return [...m.entries()]
+    .map(([closer, n]) => ({ closer, n }))
+    .sort((a, b) => b.n - a.n || a.closer.localeCompare(b.closer, "pt-BR"));
+}
+
 // ── Detalhe: os campos "soltos" que vieram do painel ────────────────────
 
 /**
@@ -261,6 +296,7 @@ export const CAMPOS_EXTRAS: { chave: string; label: string }[] = [
   { chave: "mais_confuso", label: "O que mais confunde" },
   { chave: "barreira", label: "Maior barreira" },
   { chave: "compromisso", label: "Compromisso declarado" },
+  { chave: "closer", label: "Closer responsável" },
   { chave: "acompanhante", label: "Vai levar acompanhante" },
   { chave: "comentario", label: "Comentário da equipe" },
   { chave: "primeiro_scan", label: "1º check-in" },

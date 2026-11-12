@@ -8,7 +8,9 @@ import { fmtVal } from "@/lib/config";
 import { CLASSES, normalizarEmail, type Classe, type Inscrito } from "@/lib/analise";
 import {
   abordagensPorEmail,
+  closerDe,
   COMBINACOES,
+  contarPorCloser,
   contarPorClasse,
   contarPorDia,
   detalhesDe,
@@ -16,6 +18,7 @@ import {
   ehNaoAluno,
   filtrarAluno,
   filtrarClasse,
+  filtrarCloser,
   filtrarDia,
   filtrarParticipantes,
   filtrarPresenca,
@@ -24,6 +27,7 @@ import {
   ordenarParticipantes,
   resumoPresenca,
   rotulosPresenca,
+  SEM_CLOSER,
   type FiltroAluno,
   type FiltroDia,
   type FiltroPresenca,
@@ -54,6 +58,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
   const [aluno, setAluno] = useState<FiltroAluno>("todos");
   const [dia, setDia] = useState<FiltroDia>("todos");
   const [classes, setClasses] = useState<Set<Classe>>(new Set());
+  const [closer, setCloser] = useState<string>("todos");
   const [aberto, setAberto] = useState<Inscrito | null>(null);
   const [abordagens, setAbordagens] = useState<Abordagem[]>([]);
 
@@ -65,6 +70,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     setAluno("todos");
     setDia("todos");
     setClasses(new Set());
+    setCloser("todos");
     (async () => {
       const { data, error } = await supabase
         .from("inscritos")
@@ -118,13 +124,16 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     () =>
       inscritos
         ? ordenarParticipantes(
-            filtrarClasse(
-              filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia),
-              classes
+            filtrarCloser(
+              filtrarClasse(
+                filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia),
+                classes
+              ),
+              closer
             )
           )
         : [],
-    [inscritos, termo, presenca, aluno, dia, classes]
+    [inscritos, termo, presenca, aluno, dia, classes, closer]
   );
 
   /** Contagem por classe respeitando os OUTROS filtros (busca, presença,
@@ -133,20 +142,54 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
     () =>
       contarPorClasse(
         inscritos
-          ? filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia)
+          ? filtrarCloser(
+              filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia),
+              closer
+            )
           : []
       ),
-    [inscritos, termo, presenca, aluno, dia]
+    [inscritos, termo, presenca, aluno, dia, closer]
   );
 
   /** Mesma ideia para os chips de dia: respeitam busca, aluno e classe. */
   const porDia = useMemo(
     () =>
       contarPorDia(
-        inscritos ? filtrarClasse(filtrarAluno(filtrarParticipantes(inscritos, termo), aluno), classes) : []
+        inscritos
+          ? filtrarCloser(filtrarClasse(filtrarAluno(filtrarParticipantes(inscritos, termo), aluno), classes), closer)
+          : []
       ),
-    [inscritos, termo, aluno, classes]
+    [inscritos, termo, aluno, classes, closer]
   );
+  /** Closers do painel, contados com os OUTROS filtros (busca, presença,
+   *  aluno, dia, classe). Lista vazia = painel sem closer → filtro some. */
+  const porCloser = useMemo(
+    () =>
+      contarPorCloser(
+        inscritos
+          ? filtrarClasse(
+              filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia),
+              classes
+            )
+          : []
+      ),
+    [inscritos, termo, presenca, aluno, dia, classes]
+  );
+  const temCloser = useMemo(() => (inscritos ?? []).some((i) => closerDe(i)), [inscritos]);
+  const semCloser = useMemo(
+    () =>
+      inscritos
+        ? filtrarCloser(
+            filtrarClasse(
+              filtrarDia(filtrarAluno(filtrarPresenca(filtrarParticipantes(inscritos, termo), presenca), aluno), dia),
+              classes
+            ),
+            SEM_CLOSER
+          ).length
+        : 0,
+    [inscritos, termo, presenca, aluno, dia, classes]
+  );
+
   /** Base das porcentagens dos chips: presentes com dia marcado. */
   const comDia = COMBINACOES.reduce((s, c) => s + porDia[c.chave], 0);
 
@@ -161,7 +204,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
 
   /** Contadores dos chips: presentes vêm do painel importado, não do app. */
   const resumo = useMemo(() => (inscritos ? resumoPresenca(inscritos) : null), [inscritos]);
-  const filtrando = Boolean(termo) || presenca !== "todos" || aluno !== "todos" || dia !== "todos" || classes.size > 0;
+  const filtrando = Boolean(termo) || presenca !== "todos" || aluno !== "todos" || dia !== "todos" || classes.size > 0 || closer !== "todos";
 
   if (inscritos === null) return <Empty>Carregando…</Empty>;
   if (!inscritos.length) {
@@ -238,6 +281,33 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
               base={comDia}
             />
           </div>
+          {/* Closer responsável pela lead (vem do painel). Só aparece quando o
+              painel importado traz o closer de cada lead. */}
+          {temCloser && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-muted-foreground">Closer</span>
+              {[
+                { valor: "todos", label: "Todos" },
+                ...porCloser.map((c) => ({ valor: c.closer, label: `${c.closer} · ${c.n}` })),
+                { valor: SEM_CLOSER, label: `Sem closer · ${semCloser}` },
+              ].map((o) => {
+                const ativo = closer === o.valor;
+                return (
+                  <button
+                    key={o.valor}
+                    type="button"
+                    aria-pressed={ativo}
+                    onClick={() => setCloser(ativo ? "todos" : o.valor)}
+                    className={`h-7 rounded-full border border-border-strong px-2.5 text-xs font-medium transition-colors ${
+                      ativo ? "bg-foreground text-background" : "bg-card text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {/* Lead Score: filtro e legenda ao mesmo tempo. Cores do painel;
               toque liga/desliga a classe, pode marcar várias. */}
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -308,6 +378,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
                   <span className="block truncate text-xs text-muted-foreground">
                     {rotulosPresenca(i).length ? "Presente" : "Sem check-in"}
                     {i.contatoConfirmou === "Confirmou" ? " · Confirmou" : ""}
+                    {closerDe(i) ? ` · Closer: ${closerDe(i)}` : ""}
                   </span>
                   {/* Quem fechou aparece embaixo do nome: na lista cheia é o que
                       o time pergunta primeiro ("quem já pegou essa?"). */}

@@ -21,6 +21,10 @@ import {
   ordenarParticipantes,
   placarDeAbordagens,
   semAcento,
+  closerDe,
+  contarPorCloser,
+  filtrarCloser,
+  SEM_CLOSER,
 } from "./participantes";
 
 const p = (over: Record<string, unknown> = {}) =>
@@ -286,5 +290,36 @@ describe("abordagensPorMembro", () => {
     expect(r[0].leads[0].registros.map((a) => a.id)).toEqual(["3", "1"]);
     expect(r[0].leads[1].classe).toBe("B");
     expect(r[1].leads[0]).toMatchObject({ nome: "fora@x", classe: null });
+  });
+});
+
+describe("closer responsável", () => {
+  const lista = [
+    p({ email: "a@x", closer: "Mila" }),
+    p({ email: "b@x", closer: "Bruna" }),
+    p({ email: "c@x", closer: " Mila " }),
+    p({ email: "d@x", quem_confirmou: "Gabriel" }),
+    p({ email: "e@x" }),
+  ];
+  it("lê extras.closer e, na falta, quem_confirmou", () => {
+    expect(closerDe(lista[0])).toBe("Mila");
+    expect(closerDe(lista[2])).toBe("Mila");
+    expect(closerDe(lista[3])).toBe("Gabriel");
+    expect(closerDe(lista[4])).toBeNull();
+  });
+  it("filtra por closer, sem closer e todos", () => {
+    expect(filtrarCloser(lista, "todos")).toHaveLength(5);
+    expect(filtrarCloser(lista, "Mila").map((i) => i.email)).toEqual(["a@x", "c@x"]);
+    expect(filtrarCloser(lista, SEM_CLOSER).map((i) => i.email)).toEqual(["e@x"]);
+  });
+  it("conta leads por closer, maior primeiro", () => {
+    expect(contarPorCloser(lista)).toEqual([
+      { closer: "Mila", n: 2 },
+      { closer: "Bruna", n: 1 },
+      { closer: "Gabriel", n: 1 },
+    ]);
+  });
+  it("aparece na ficha", () => {
+    expect(detalhesDe(lista[0])).toContainEqual({ label: "Closer responsável", valor: "Mila" });
   });
 });
