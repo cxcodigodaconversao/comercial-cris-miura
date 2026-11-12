@@ -9,6 +9,7 @@ import { CLASSES, normalizarEmail, type Classe, type Inscrito } from "@/lib/anal
 import {
   abordagensPorEmail,
   closerDe,
+  closerDoUsuario,
   COMBINACOES,
   contarPorCloser,
   contarPorClasse,
@@ -77,7 +78,14 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
         .select(SELECT_INSCRITO)
         .eq("evento_id", evento.id);
       if (error) return toast("erro", "Não foi possível carregar os participantes.", error.message);
-      setInscritos((data ?? []) as unknown as Inscrito[]);
+      const lista = (data ?? []) as unknown as Inscrito[];
+      setInscritos(lista);
+      // Closer logado já abre vendo só os leads dele (pode trocar no chip).
+      if (perfil.papel === "closer") {
+        const nomes = [...new Set(lista.map(closerDe).filter((c): c is string => Boolean(c)))];
+        const meu = closerDoUsuario(perfil.nome, nomes);
+        if (meu) setCloser(meu);
+      }
       const { data: abs } = await supabase
         .from("abordagens")
         .select(SELECT_ABORDAGEM)
@@ -283,6 +291,12 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
           </div>
           {/* Closer responsável pela lead (vem do painel). Só aparece quando o
               painel importado traz o closer de cada lead. */}
+          {!temCloser && (
+            <p className="mt-3 rounded-md border border-dashed border-border-strong px-3 py-2 text-xs text-muted-foreground">
+              <span className="font-medium">Closer:</span> o painel importado neste evento ainda não traz o closer de
+              cada lead. Um admin precisa subir o index.html novo na aba Análise.
+            </p>
+          )}
           {temCloser && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-xs font-medium text-muted-foreground">Closer</span>

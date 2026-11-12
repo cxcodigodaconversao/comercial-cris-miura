@@ -26,6 +26,7 @@ import {
   filtrarCloser,
   SEM_CLOSER,
   resumoPorCloser,
+  closerDoUsuario,
 } from "./participantes";
 
 const p = (over: Record<string, unknown> = {}) =>
@@ -341,5 +342,13 @@ describe("resumoPorCloser", () => {
   });
   it("painel sem closer → vazio", () => {
     expect(resumoPorCloser([p({ email: "a@x" })])).toEqual([]);
+  });
+});
+
+describe("closerDoUsuario", () => {
+  it("casa pelo primeiro nome, sem acento", () => {
+    expect(closerDoUsuario("Mila Pinheiro", ["Mila", "Bruna"])).toBe("Mila");
+    expect(closerDoUsuario("BRUNA valadares", ["Mila", "Bruna"])).toBe("Bruna");
+    expect(closerDoUsuario("Everton Rodrigues", ["Mila", "Bruna"])).toBeNull();
   });
 });

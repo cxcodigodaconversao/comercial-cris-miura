@@ -280,6 +280,18 @@ export function contarPorCloser(lista: Inscrito[]): { closer: string; n: number 
     .sort((a, b) => b.n - a.n || a.closer.localeCompare(b.closer, "pt-BR"));
 }
 
+/**
+ * O closer da base que corresponde ao usuário logado, pelo primeiro nome
+ * (sem acento/caixa): "Mila Pinheiro" → "Mila". Null se não bater com
+ * nenhum — aí a pessoa começa vendo todos.
+ */
+export function closerDoUsuario(nomeUsuario: string, closers: string[]): string | null {
+  const primeiro = (s: string) => semAcento(s).split(/\s+/)[0] ?? "";
+  const meu = primeiro(nomeUsuario);
+  if (!meu) return null;
+  return closers.find((c) => semAcento(c) === semAcento(nomeUsuario)) ?? closers.find((c) => primeiro(c) === meu) ?? null;
+}
+
 export type LinhaCloser = {
   closer: string;
   semCloser: boolean;
