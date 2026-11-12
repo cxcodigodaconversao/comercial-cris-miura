@@ -382,10 +382,34 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
         <Card>
           <CardContent className="divide-y divide-border pt-0">
             {lista.map((i) => (
+              <div key={i.email} className="flex items-center gap-3">
+              {/* Instagram a um toque, sem abrir a ficha: é como o time
+                  reconhece a pessoa no salão. Fica fora do botão da linha
+                  (link dentro de botão não é HTML válido). */}
+              {linkInstagram(i.extras.instagram) ? (
+                <a
+                  href={linkInstagram(i.extras.instagram)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Instagram de ${i.nome}`}
+                  title="Abrir Instagram"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+                  style={{ background: "linear-gradient(45deg,#f09433,#dc2743 50%,#bc1888)" }}
+                >
+                  <Instagram className="h-5 w-5" />
+                </a>
+              ) : (
+                <span
+                  aria-hidden
+                  title="Sem Instagram na base"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-border-strong text-muted opacity-50"
+                >
+                  <Instagram className="h-5 w-5" />
+                </span>
+              )}
               <button
-                key={i.email}
                 onClick={() => setAberto(i)}
-                className="flex w-full items-center gap-3 py-3 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">{i.nome}</span>
@@ -429,6 +453,7 @@ export function Participantes({ evento, vendas, perfil }: { evento: Evento; vend
                   {compradores.has(i.email) && <Badge tone="success">Comprou</Badge>}
                 </span>
               </button>
+              </div>
             ))}
           </CardContent>
         </Card>
