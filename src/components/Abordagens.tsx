@@ -16,7 +16,7 @@ import {
 import type { Abordagem, Evento, Usuario } from "@/lib/types";
 import { Button } from "./ui/button";
 import { Card, CardContent, Empty, SectionLabel } from "./ui/card";
-import { Input } from "./ui/field";
+import { Input, Textarea } from "./ui/field";
 import { useFeedback } from "./ui/feedback";
 
 const PAGINA = 1000;
@@ -48,6 +48,17 @@ function lerAnaliseSalva(eventoId: string): AnaliseDasAbordagens | null {
   }
 }
 
+/** O que a mentoria entrega, escrito pela equipe. Fica neste aparelho. */
+const chaveDaMentoria = (eventoId: string) => `analise-abordagens:mentoria:${eventoId}`;
+
+function lerMentoriaSalva(eventoId: string): string {
+  try {
+    return localStorage.getItem(chaveDaMentoria(eventoId)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
@@ -71,6 +82,8 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
   const [erro, setErro] = useState<string | null>(null);
   const [quem, setQuem] = useState("");
   const [termo, setTermo] = useState("");
+  const [mentoria, setMentoria] = useState("");
+  const [mentoriaAberta, setMentoriaAberta] = useState(false);
   const podeGerar = perfil.papel !== "promotor";
 
   useEffect(() => {
@@ -79,6 +92,7 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
     setAnalise(lerAnaliseSalva(evento.id));
     setErro(null);
     setQuem("");
+    setMentoria(lerMentoriaSalva(evento.id));
     (async () => {
       try {
         const [abs, ins] = await Promise.all([
@@ -118,7 +132,7 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
       const res = await fetch("/api/abordagens/analise", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ eventoId: evento.id }),
+        body: JSON.stringify({ eventoId: evento.id, mentoria: mentoria.trim() }),
       });
       const bruto = await res.text();
       let corpo: { analise?: AnaliseDasAbordagens; error?: string; errorMessage?: string } | null = null;
@@ -211,13 +225,59 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
           {!analise && !gerando && (
             <p className="mt-3 text-sm text-muted-foreground">
               Toque em Gerar análise para ver as dificuldades reais das leads, as objeções que a expert precisa
-              quebrar e as provas sociais para levar ao palco.
+              quebrar e as provas sociais para levar ao palco, sempre direcionando para a mentoria.
             </p>
+          )}
+
+          {podeGerar && (
+            <div className="mt-3 rounded-md border border-border bg-background/60 p-2.5">
+              <button
+                type="button"
+                aria-expanded={mentoriaAberta}
+                onClick={() => setMentoriaAberta((v) => !v)}
+                className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium"
+              >
+                <span>O que a mentoria entrega</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {mentoriaAberta ? "Fechar" : mentoria.trim() ? "Preenchido · editar" : "Não preenchido · escrever"}
+                </span>
+              </button>
+              {mentoriaAberta && (
+                <>
+                  <Textarea
+                    className="mt-2"
+                    value={mentoria}
+                    maxLength={3000}
+                    onChange={(e) => {
+                      setMentoria(e.target.value);
+                      try {
+                        localStorage.setItem(chaveDaMentoria(evento.id), e.target.value);
+                      } catch {
+                        // Sem armazenamento: vale enquanto a tela estiver aberta.
+                      }
+                    }}
+                    placeholder="Ex.: nome da mentoria, duração, encontros com a Dra. Cristina, o que o aluno recebe, para quem é."
+                    aria-label="O que a mentoria entrega"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    A análise usa este texto para direcionar cada ponto para a mentoria. Sem ele, a IA fala só em
+                    termos gerais, porque não pode inventar o que a mentoria entrega. Depois de escrever, toque em{" "}
+                    {analise ? "Atualizar" : "Gerar análise"}.
+                  </p>
+                </>
+              )}
+            </div>
           )}
 
           {analise && (
             <div className="mt-4 space-y-5">
               {analise.resumo && <p className="text-sm leading-relaxed">{analise.resumo}</p>}
+              {analise.mensagemCentral && (
+                <div className="rounded-md border-l-4 border-accent bg-accent/10 p-3">
+                  <p className="text-xs font-medium text-muted-foreground">Mensagem central para o palco</p>
+                  <p className="mt-1 text-sm font-medium leading-relaxed">{analise.mensagemCentral}</p>
+                </div>
+              )}
               <Bloco titulo="Dificuldades reais" itens={analise.dificuldades} />
               <Bloco titulo="Objeções para quebrar no palco" itens={analise.objecoes} />
               <Bloco titulo="Provas sociais para levar ao palco" itens={analise.provasSociais} />
@@ -381,6 +441,18 @@ function Bloco({ titulo, itens }: { titulo: string; itens: ItemDaAnalise[] }) {
               <p className="mt-1.5 text-sm">
                 <span className="font-medium">No palco: </span>
                 {i.comoQuebrar}
+              </p>
+            )}
+            {i.sozinho && (
+              <p className="mt-1.5 text-sm">
+                <span className="font-medium">Por que sozinho não resolve: </span>
+                {i.sozinho}
+              </p>
+            )}
+            {i.naMentoria && (
+              <p className="mt-1.5 rounded bg-accent/10 px-2 py-1.5 text-sm">
+                <span className="font-medium">Direcionar para a mentoria: </span>
+                {i.naMentoria}
               </p>
             )}
             {i.frases.map((f) => (

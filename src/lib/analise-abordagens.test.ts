@@ -95,6 +95,17 @@ describe("montarPrompt", () => {
     expect(prompt).not.toContain("Ana Souza");
   });
 
+  it("leva a direção da mentoria: produtos do evento e o texto da equipe", () => {
+    const { prompt } = montarPrompt(conversas, undefined, {
+      produtos: ["Mentoria Premium", " "],
+      mentoria: "  Encontros quinzenais com a Dra. Cristina.  ",
+    });
+    expect(prompt).toContain("Produtos à venda neste evento: Mentoria Premium.");
+    expect(prompt).toContain("Encontros quinzenais com a Dra. Cristina.");
+    expect(prompt.indexOf("<mentoria>")).toBeLessThan(prompt.indexOf("<anotacoes>"));
+    expect(montarPrompt(conversas).prompt).toContain("<mentoria>\n(não informado)\n</mentoria>");
+  });
+
   it("respeita o teto ficando com as mais recentes", () => {
     const { usadas, cortadas } = montarPrompt(conversas, 60);
     expect(usadas.map((c) => c.email)).toEqual(["ana@x.com"]);
@@ -110,7 +121,17 @@ describe("interpretarAnalise", () => {
     const a = interpretarAnalise(
       resposta({
         resumo: "Salão travado em dinheiro.",
-        dificuldades: [{ titulo: "Agenda vazia", descricao: "x", leads: [2, 2, 9, "L1"], frases: [] }],
+        mensagemCentral: "Sozinha você continua com a agenda vazia.",
+        dificuldades: [
+          {
+            titulo: "Agenda vazia",
+            descricao: "x",
+            sozinho: "Tenta há anos sem direção.",
+            naMentoria: "Mostrar o acompanhamento.",
+            leads: [2, 2, 9, "L1"],
+            frases: [],
+          },
+        ],
         objecoes: [],
         provasSociais: [],
       }),
@@ -120,6 +141,11 @@ describe("interpretarAnalise", () => {
       { email: "carla@x.com", nome: "Carla Dias" },
       { email: "ana@x.com", nome: "Ana Souza" },
     ]);
+    expect(a.mensagemCentral).toBe("Sozinha você continua com a agenda vazia.");
+    expect(a.dificuldades[0]).toMatchObject({
+      sozinho: "Tenta há anos sem direção.",
+      naMentoria: "Mostrar o acompanhamento.",
+    });
     expect(a.leadsAnalisadas).toBe(2);
     expect(a.comentarios).toBe(3);
   });

@@ -3,7 +3,13 @@ import { ErroApi, autenticar, responderErro } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { SELECT_ABORDAGEM, SELECT_INSCRITO } from "@/lib/consultas";
 import type { Inscrito } from "@/lib/analise";
-import { SISTEMA_ANALISE, conversasPorLead, interpretarAnalise, montarPrompt } from "@/lib/analise-abordagens";
+import {
+  MAX_CARACTERES,
+  SISTEMA_ANALISE,
+  conversasPorLead,
+  interpretarAnalise,
+  montarPrompt,
+} from "@/lib/analise-abordagens";
 import { ErroIA, gerarTexto } from "@/lib/gemini";
 import type { Abordagem } from "@/lib/types";
 
@@ -79,7 +85,19 @@ export async function POST(req: NextRequest) {
     const abordagens = await lerTudo<Abordagem>("abordagens", SELECT_ABORDAGEM, eventoId);
     const inscritos = await lerInscritos(eventoId, [...new Set(abordagens.map((a) => a.email))]);
 
-    const { prompt, usadas, cortadas } = montarPrompt(conversasPorLead(abordagens, inscritos));
+    // A direção da venda: nomes dos produtos do evento (do banco) e o que a
+    // equipe escreveu sobre a mentoria (da tela). Nada disso mora no código.
+    const { data: evento } = await supabaseAdmin().from("eventos").select("produtos").eq("id", eventoId).maybeSingle();
+    const produtos = (Array.isArray(evento?.produtos) ? evento.produtos : [])
+      .map((p: unknown) => String((p as { nome?: unknown })?.nome ?? "").trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    const mentoria = typeof corpo?.mentoria === "string" ? corpo.mentoria : "";
+
+    const { prompt, usadas, cortadas } = montarPrompt(conversasPorLead(abordagens, inscritos), MAX_CARACTERES, {
+      produtos,
+      mentoria,
+    });
     if (!usadas.length) {
       throw new ErroApi(422, "Ainda não há comentário de abordagem com texto neste evento.");
     }
