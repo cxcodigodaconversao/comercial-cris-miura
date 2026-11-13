@@ -237,13 +237,19 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
                 onClick={() => setMentoriaAberta((v) => !v)}
                 className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium"
               >
-                <span>O que a mentoria entrega</span>
+                <span>Base da análise: Mentoria DSD</span>
                 <span className="text-xs font-normal text-muted-foreground">
-                  {mentoriaAberta ? "Fechar" : mentoria.trim() ? "Preenchido · editar" : "Não preenchido · escrever"}
+                  {mentoriaAberta ? "Fechar" : mentoria.trim() ? "Com complemento · editar" : "Ver e complementar"}
                 </span>
               </button>
               {mentoriaAberta && (
                 <>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    O que a Mentoria DSD entrega já está fixo no app para toda a equipe (4 pilares, DIPTs, AIAs,
+                    Dias de Prática, Comunidade, Hotseats, encontros presenciais, Desafios, SNIPP, garantia). A IA
+                    não fala de duração, preço ou número de encontros com a Dra. Cristina, porque ainda não foram
+                    confirmados.
+                  </p>
                   <Textarea
                     className="mt-2"
                     value={mentoria}
@@ -256,12 +262,11 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
                         // Sem armazenamento: vale enquanto a tela estiver aberta.
                       }
                     }}
-                    placeholder="Ex.: nome da mentoria, duração, encontros com a Dra. Cristina, o que o aluno recebe, para quem é."
-                    aria-label="O que a mentoria entrega"
+                    placeholder="Opcional. Ex.: condição especial deste evento, bônus do dia, caso de aluno que vai subir ao palco."
+                    aria-label="Complemento para a análise"
                   />
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    A análise usa este texto para direcionar cada ponto para a mentoria. Sem ele, a IA fala só em
-                    termos gerais, porque não pode inventar o que a mentoria entrega. Depois de escrever, toque em{" "}
+                    Este complemento é opcional e fica salvo só neste aparelho. Depois de escrever, toque em{" "}
                     {analise ? "Atualizar" : "Gerar análise"}.
                   </p>
                 </>

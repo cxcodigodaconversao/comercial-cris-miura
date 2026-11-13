@@ -7,6 +7,7 @@ import {
   interpretarAnalise,
   leadsComMaisDeUmCloser,
   montarPrompt,
+  SISTEMA_ANALISE,
 } from "./analise-abordagens";
 import type { Abordagem } from "./types";
 
@@ -100,10 +101,24 @@ describe("montarPrompt", () => {
       produtos: ["Mentoria Premium", " "],
       mentoria: "  Encontros quinzenais com a Dra. Cristina.  ",
     });
-    expect(prompt).toContain("Produtos à venda neste evento: Mentoria Premium.");
+    expect(prompt).toContain("Produtos cadastrados neste evento: Mentoria Premium.");
     expect(prompt).toContain("Encontros quinzenais com a Dra. Cristina.");
     expect(prompt.indexOf("<mentoria>")).toBeLessThan(prompt.indexOf("<anotacoes>"));
-    expect(montarPrompt(conversas).prompt).toContain("<mentoria>\n(não informado)\n</mentoria>");
+    // A base da Mentoria DSD vai sempre, mesmo sem nada escrito na tela.
+    const base = montarPrompt(conversas).prompt;
+    expect(base).toContain("Mentoria DSD (Dentistas que Salvam Dentes)");
+    expect(base).toContain("10 DIPTs");
+  });
+
+  it("não leva ao modelo o que ainda não foi confirmado", () => {
+    const tudo = SISTEMA_ANALISE + montarPrompt(conversas).prompt;
+    // Preço e parcela dos slides não batem entre si; duração não consta.
+    expect(tudo).not.toContain("60.000");
+    expect(tudo).not.toContain("2.997");
+    expect(tudo).not.toMatch(/\b\d+ meses de mentoria/i);
+    expect(SISTEMA_ANALISE).toContain("a duração da mentoria");
+    expect(SISTEMA_ANALISE).toContain("o preço, o valor das parcelas");
+    expect(SISTEMA_ANALISE).toContain("quantos encontros são diretamente com a Dra. Cristina");
   });
 
   it("respeita o teto ficando com as mais recentes", () => {
