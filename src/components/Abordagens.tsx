@@ -121,7 +121,7 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
         body: JSON.stringify({ eventoId: evento.id }),
       });
       const bruto = await res.text();
-      let corpo: { analise?: AnaliseDasAbordagens; error?: string } | null = null;
+      let corpo: { analise?: AnaliseDasAbordagens; error?: string; errorMessage?: string } | null = null;
       try {
         corpo = bruto ? JSON.parse(bruto) : null;
       } catch {
@@ -130,7 +130,11 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
           `A análise demorou mais que o limite do servidor (código ${res.status}). Tente de novo em instantes.`
         );
       }
-      if (!res.ok || !corpo?.analise) throw new Error(corpo?.error || `Erro ${res.status}.`);
+      if (!res.ok || !corpo?.analise) {
+        // `errorMessage` é como a hospedagem descreve função cortada por tempo ou que quebrou.
+        const detalhe = corpo?.error || corpo?.errorMessage || (bruto ? bruto.slice(0, 200) : "sem resposta do servidor");
+        throw new Error(corpo?.error ? detalhe : `Erro ${res.status}: ${detalhe}`);
+      }
       setAnalise(corpo.analise);
       try {
         localStorage.setItem(chaveDaAnalise(evento.id), JSON.stringify(corpo.analise));
