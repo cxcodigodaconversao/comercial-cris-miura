@@ -59,13 +59,31 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
       const form = new FormData();
       form.append("arquivo", arquivo);
       form.append("eventoId", evento.id);
-      const res = await fetch("/api/inscritos/importar", {
+      const planilha = /\.xlsx$/i.test(arquivo.name);
+      const res = await fetch(planilha ? "/api/inscritos/planilha" : "/api/inscritos/importar", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
       const corpo = await res.json();
       if (!res.ok) throw new Error(corpo.error || `Erro ${res.status}.`);
+      if (planilha) {
+        const r = corpo.resumo as {
+          tipo: "credenciamento" | "clint";
+          total: number;
+          novos: number;
+          atualizados: number;
+          presentes: number;
+          comNota: number;
+          ignoradas: number;
+        };
+        toast(
+          "sucesso",
+          r.tipo === "clint" ? "Planilha de confirmados (Clint) aplicada." : "Planilha do credenciamento aplicada.",
+          `${r.atualizados} atualizados, ${r.novos} novos. Base: ${r.total} inscritos, ${r.presentes} presentes, ${r.comNota} com nota.` +
+            (r.ignoradas ? ` ${r.ignoradas} linha(s) sem e-mail ignorada(s).` : "")
+        );
+      } else
       toast("sucesso", `${corpo.importados} inscritos importados.`, corpo.descartados ? `${corpo.descartados} linha(s) sem e-mail ignorada(s).` : undefined);
       await carregar();
     } catch (e) {
@@ -259,9 +277,22 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
         <CardContent className="pt-4">
           <SectionLabel>Atualizar base de inscritos</SectionLabel>
           <p className="mt-1 text-sm text-muted">
-            Suba o <span className="num">index.html</span> do painel de conversão para atualizar os dados. A
-            importação substitui a base deste evento inteira — os números acima recalculam sozinhos.
+            Suba a <span className="font-medium">planilha (.xlsx)</span> ou o <span className="num">index.html</span>{" "}
+            do painel. Os números acima recalculam sozinhos.
           </p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted">
+            <li>
+              <span className="font-medium">Planilha do credenciamento</span> (export de participantes): atualiza a
+              presença de cada dia e inclui quem se inscreveu na porta.
+            </li>
+            <li>
+              <span className="font-medium">Planilha de confirmados do Clint</span>: atualiza closer, faturamento,
+              tempo de formado e especialização, e recalcula nota e classe.
+            </li>
+            <li>
+              <span className="font-medium">index.html</span>: substitui a base inteira do evento.
+            </li>
+          </ul>
           {atualizadoEm && (
             <p className="num mt-2 text-xs text-muted">
               Última atualização: {new Date(atualizadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
@@ -270,13 +301,13 @@ export function Analise({ evento, vendas, perfil }: { evento: Evento; vendas: Ve
           <input
             ref={inputRef}
             type="file"
-            accept=".html,.htm,.json"
+            accept=".xlsx,.html,.htm,.json"
             className="hidden"
             onChange={(e) => e.target.files?.[0] && importar(e.target.files[0])}
           />
           <Button variant="outline" full className="mt-3" disabled={ocupado} onClick={() => inputRef.current?.click()}>
             <Upload className="h-4 w-4" />
-            {ocupado ? "Importando..." : inscritos?.length ? "Subir novo HTML" : "Importar painel"}
+            {ocupado ? "Importando..." : inscritos?.length ? "Subir planilha ou HTML" : "Importar planilha ou painel"}
           </Button>
         </CardContent>
       </Card>
