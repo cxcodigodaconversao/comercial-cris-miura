@@ -71,8 +71,17 @@ const ehLimiteDeTaxa = (msg: string) =>
  * Limite de taxa é a exceção: acontece quando duas pessoas geram no mesmo
  * segundo, e uma segunda tentativa costuma passar. Sem isso, o promotor vê
  * um erro que não é dele e que some sozinho — o pior tipo de erro.
+ *
+ * `config` é o generationConfig opcional (ex.: resposta em JSON, sem
+ * "pensamento" para caber no tempo da função). Se o modelo recusar a
+ * configuração, a mesma chamada é refeita sem ela: melhor uma resposta
+ * mais lenta do que nenhuma.
  */
-export async function gerarTexto(sistema: string, prompt: string): Promise<string> {
+export async function gerarTexto(
+  sistema: string,
+  prompt: string,
+  config?: Record<string, unknown>
+): Promise<string> {
   const chave = process.env.GEMINI_API_KEY;
   if (!chave) {
     throw new ErroIA("GEMINI_API_KEY não configurada no servidor.", 500);
@@ -82,9 +91,15 @@ export async function gerarTexto(sistema: string, prompt: string): Promise<strin
   let ultimoErro = "";
 
   for (const modelo of CANDIDATOS) {
-    for (let tentativa = 0; tentativa < 2; tentativa++) {
+    let usarConfig = Boolean(config);
+    let esperou = false;
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
       try {
-        const m = genAI.getGenerativeModel({ model: modelo, systemInstruction: sistema });
+        const m = genAI.getGenerativeModel({
+          model: modelo,
+          systemInstruction: sistema,
+          ...(usarConfig ? { generationConfig: config as never } : {}),
+        });
         const r = await m.generateContent(prompt);
         const texto = r.response.text().trim();
         if (texto) return texto;
@@ -94,12 +109,17 @@ export async function gerarTexto(sistema: string, prompt: string): Promise<strin
         const msg = (e as Error).message ?? "";
         ultimoErro = msg;
 
-        if (ehLimiteDeTaxa(msg) && tentativa === 0) {
+        if (ehLimiteDeTaxa(msg) && !esperou) {
+          esperou = true;
           await espera(1500);
           continue;
         }
 
         const modeloIndisponivel = msg.includes("404") || msg.toLowerCase().includes("not found");
+        if (!modeloIndisponivel && usarConfig && !ehLimiteDeTaxa(msg)) {
+          usarConfig = false;
+          continue;
+        }
         if (!modeloIndisponivel) {
           // Nem 404 nem limite de taxa: trocar de modelo não resolveria.
           return await falhar(chave, ultimoErro);

@@ -5,6 +5,7 @@ import {
   conversasPorLead,
   filtrarConversas,
   interpretarAnalise,
+  leadsComMaisDeUmCloser,
   montarPrompt,
 } from "./analise-abordagens";
 import type { Abordagem } from "./types";
@@ -59,12 +60,24 @@ describe("conversasPorLead", () => {
 
   it("conta leads por quem abordou e filtra", () => {
     expect(closersQueAbordaram(conversas)).toEqual([
-      { nome: "Bruna", n: 2 },
-      { nome: "Diego", n: 2 },
+      { nome: "Bruna", leads: 2, comentarios: 2 },
+      { nome: "Diego", leads: 2, comentarios: 2 },
     ]);
-    expect(filtrarConversas(conversas, "Bruna", "").map((c) => c.email)).toEqual(["ana@x.com", "carla@x.com"]);
+    expect(leadsComMaisDeUmCloser(conversas)).toBe(1);
+    // Bruna falou com a Carla depois de falar com a Ana.
+    expect(filtrarConversas(conversas, "Bruna", "").map((c) => c.email)).toEqual(["carla@x.com", "ana@x.com"]);
     expect(filtrarConversas(conversas, "", "PLANTAO").map((c) => c.email)).toEqual(["ana@x.com"]);
     expect(filtrarConversas(conversas, "Diego", "agenda")).toEqual([]);
+  });
+
+  it("com filtro de closer, a lead mostra só os comentários dele", () => {
+    const [ana] = filtrarConversas(conversas, "Diego", "plantao");
+    expect(ana.registros.map((r) => r.porNome)).toEqual(["Diego"]);
+    expect(ana.abordadaPor).toEqual(["Diego", "Bruna"]);
+    // O comentário da Bruna na mesma lead não entra na busca do Diego.
+    expect(filtrarConversas(conversas, "Diego", "marido")).toEqual([]);
+    const total = closersQueAbordaram(conversas).reduce((s, c) => s + c.comentarios, 0);
+    expect(total).toBe(abordagens.length);
   });
 });
 

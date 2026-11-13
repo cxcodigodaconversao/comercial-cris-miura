@@ -9,6 +9,7 @@ import {
   closersQueAbordaram,
   conversasPorLead,
   filtrarConversas,
+  leadsComMaisDeUmCloser,
   type AnaliseDasAbordagens,
   type ItemDaAnalise,
 } from "@/lib/analise-abordagens";
@@ -65,6 +66,9 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
   const [inscritos, setInscritos] = useState<Inscrito[]>([]);
   const [analise, setAnalise] = useState<AnaliseDasAbordagens | null>(null);
   const [gerando, setGerando] = useState(false);
+  // O erro fica escrito na tela: o aviso flutuante some em segundos e, no
+  // salão, ninguém fica olhando para ele.
+  const [erro, setErro] = useState<string | null>(null);
   const [quem, setQuem] = useState("");
   const [termo, setTermo] = useState("");
   const podeGerar = perfil.papel !== "promotor";
@@ -73,6 +77,7 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
     let vivo = true;
     setAbordagens(null);
     setAnalise(lerAnaliseSalva(evento.id));
+    setErro(null);
     setQuem("");
     (async () => {
       try {
@@ -105,6 +110,7 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
 
   async function gerar() {
     setGerando(true);
+    setErro(null);
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
@@ -120,7 +126,9 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
         corpo = bruto ? JSON.parse(bruto) : null;
       } catch {
         // Página de erro da hospedagem: quase sempre a IA demorou além do limite.
-        throw new Error("A análise demorou mais que o limite do servidor. Tente de novo em instantes.");
+        throw new Error(
+          `A análise demorou mais que o limite do servidor (código ${res.status}). Tente de novo em instantes.`
+        );
       }
       if (!res.ok || !corpo?.analise) throw new Error(corpo?.error || `Erro ${res.status}.`);
       setAnalise(corpo.analise);
@@ -131,7 +139,9 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
       }
       toast("sucesso", "Análise atualizada.");
     } catch (e) {
-      toast("erro", "Não foi possível gerar a análise.", (e as Error).message);
+      const msg = (e as Error).message || "Falha de conexão.";
+      setErro(msg);
+      toast("erro", "Não foi possível gerar a análise.", msg);
     } finally {
       setGerando(false);
     }
@@ -147,6 +157,7 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
     );
   }
 
+  const repetidas = leadsComMaisDeUmCloser(conversas);
   const novos = analise ? comentariosComTexto - analise.comentarios : 0;
 
   return (
@@ -180,6 +191,12 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
             </p>
           )}
 
+          {erro && !gerando && (
+            <p className="mt-3 rounded-md bg-danger-weak px-2.5 py-2 text-sm text-destructive">
+              A análise não foi gerada. Motivo: {erro}
+            </p>
+          )}
+
           {analise && novos > 0 && !gerando && (
             <p className="mt-3 rounded-md bg-warning-weak px-2.5 py-2 text-xs text-warning">
               {novos} comentário{novos === 1 ? "" : "s"} novo{novos === 1 ? "" : "s"} desde esta análise. Toque em
@@ -200,13 +217,48 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
               <Bloco titulo="Dificuldades reais" itens={analise.dificuldades} />
               <Bloco titulo="Objeções para quebrar no palco" itens={analise.objecoes} />
               <Bloco titulo="Provas sociais para levar ao palco" itens={analise.provasSociais} />
-              <p className="text-[11px] text-muted">
+              <p className="text-xs text-muted-foreground">
                 Leitura feita por IA só com os comentários registrados. As frases entre aspas foram conferidas
                 e estão escritas nos comentários.
                 {analise.cortadas > 0 &&
                   ` Ficaram de fora ${analise.cortadas} leads mais antigas, por limite de tamanho.`}
               </p>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-3">
+        <CardContent className="pt-4">
+          <SectionLabel>Abordagens por closer</SectionLabel>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted-foreground">
+                <th className="pb-1.5 font-medium">Quem abordou</th>
+                <th className="pb-1.5 text-right font-medium">Leads</th>
+                <th className="pb-1.5 text-right font-medium">Comentários</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {closers.map((c) => (
+                <tr key={c.nome}>
+                  <td className="py-1.5">{c.nome}</td>
+                  <td className="num py-1.5 text-right">{c.leads}</td>
+                  <td className="num py-1.5 text-right">{c.comentarios}</td>
+                </tr>
+              ))}
+              <tr className="font-semibold">
+                <td className="py-1.5">Total do evento</td>
+                <td className="num py-1.5 text-right">{conversas.length}</td>
+                <td className="num py-1.5 text-right">{abordagens.length}</td>
+              </tr>
+            </tbody>
+          </table>
+          {repetidas > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {repetidas} lead{repetidas === 1 ? " foi abordada" : "s foram abordadas"} por mais de um closer e
+              conta{repetidas === 1 ? "" : "m"} para cada um. Por isso a soma das leads por closer passa do total.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -226,27 +278,31 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
             </Chip>
             {closers.map((c) => (
               <Chip key={c.nome} ativo={quem === c.nome} onClick={() => setQuem(quem === c.nome ? "" : c.nome)}>
-                {c.nome} · {c.n}
+                {c.nome} · {c.leads}
               </Chip>
             ))}
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            O número ao lado do nome é de leads abordadas. Tocando no nome, aparecem só os comentários dessa
+            pessoa.
+          </p>
 
           <div className="mt-3 space-y-2">
             {visiveis.map((c) => (
               <div key={c.email} className="rounded-md border border-border bg-background/60 p-2.5">
                 <p className="flex items-baseline justify-between gap-2 text-sm">
                   <span className="min-w-0 truncate font-medium">{c.nome}</span>
-                  <span className="num shrink-0 text-xs text-muted">
+                  <span className="num shrink-0 text-xs text-muted-foreground">
                     {[c.classe, c.presente ? "presente" : null].filter(Boolean).join(" · ")}
                   </span>
                 </p>
-                <p className="truncate text-[11px] text-muted">
+                <p className="truncate text-xs text-muted-foreground">
                   Closer responsável: {c.closerResponsavel ?? "sem closer"}
                 </p>
                 <div className="mt-1.5 space-y-1.5">
                   {c.registros.map((r) => (
                     <div key={r.id} className="border-l-2 border-accent/50 pl-2">
-                      <p className="text-[11px] text-muted">
+                      <p className="text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">{r.porNome?.trim() || "(sem nome)"}</span>
                         <span className="num"> · {dataHora(r.em)}</span>
                       </p>
@@ -254,6 +310,11 @@ export function Abordagens({ evento, perfil }: { evento: Evento; perfil: Usuario
                     </div>
                   ))}
                 </div>
+                {quem && c.abordadaPor.length > 1 && (
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Também abordada por {c.abordadaPor.filter((n) => n !== quem).join(", ")}.
+                  </p>
+                )}
               </div>
             ))}
             {!visiveis.length && <Empty>Nenhuma abordagem com esse filtro.</Empty>}
@@ -294,7 +355,7 @@ function Bloco({ titulo, itens }: { titulo: string; itens: ItemDaAnalise[] }) {
                 {n + 1}. {i.titulo}
               </span>
               {i.leads.length > 0 && (
-                <span className="num shrink-0 text-xs font-normal text-muted">
+                <span className="num shrink-0 text-xs font-normal text-muted-foreground">
                   {i.leads.length} lead{i.leads.length === 1 ? "" : "s"}
                 </span>
               )}
@@ -324,7 +385,7 @@ function Bloco({ titulo, itens }: { titulo: string; itens: ItemDaAnalise[] }) {
               </p>
             ))}
             {i.leads.length > 0 && (
-              <p className="mt-1.5 text-[11px] text-muted">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 {i.leads
                   .slice(0, 8)
                   .map((l) => l.nome)

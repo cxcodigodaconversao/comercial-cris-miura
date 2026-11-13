@@ -55,25 +55,58 @@ export function conversasPorLead(abordagens: Abordagem[], inscritos: Inscrito[])
     .sort((a, b) => b.ultimaEm.localeCompare(a.ultimaEm));
 }
 
-/** Quem abordou, com quantas leads — alimenta os chips de filtro. */
-export function closersQueAbordaram(conversas: ConversaDaLead[]): { nome: string; n: number }[] {
-  const m = new Map<string, number>();
-  for (const c of conversas) for (const n of c.abordadaPor) m.set(n, (m.get(n) ?? 0) + 1);
-  return [...m.entries()]
-    .map(([nome, n]) => ({ nome, n }))
-    .sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, "pt-BR"));
+export type AbordagensDoCloser = {
+  nome: string;
+  /** Leads distintas com quem essa pessoa conversou. */
+  leads: number;
+  /** Comentários que ela registrou (pode ser mais de um por lead). */
+  comentarios: number;
+};
+
+/**
+ * O que cada pessoa abordou, contado em separado: leads e comentários.
+ * A soma das leads pode passar do total de leads abordadas — é a lead
+ * com quem mais de um closer conversou, e ela conta para cada um.
+ */
+export function closersQueAbordaram(conversas: ConversaDaLead[]): AbordagensDoCloser[] {
+  const m = new Map<string, AbordagensDoCloser>();
+  for (const c of conversas) {
+    for (const nome of c.abordadaPor) {
+      const atual = m.get(nome) ?? { nome, leads: 0, comentarios: 0 };
+      atual.leads += 1;
+      atual.comentarios += c.registros.filter((r) => nomeDe(r) === nome).length;
+      m.set(nome, atual);
+    }
+  }
+  return [...m.values()].sort(
+    (a, b) => b.leads - a.leads || b.comentarios - a.comentarios || a.nome.localeCompare(b.nome, "pt-BR")
+  );
 }
 
+/** Leads com quem mais de uma pessoa conversou. */
+export function leadsComMaisDeUmCloser(conversas: ConversaDaLead[]): number {
+  return conversas.filter((c) => c.abordadaPor.length > 1).length;
+}
+
+/**
+ * Filtra por quem abordou e por texto. Com `quem` escolhido, cada lead
+ * volta SÓ com os comentários dessa pessoa — o filtro é "o que o Gabriel
+ * abordou", não "leads em que o Gabriel aparece". `abordadaPor` continua
+ * completo para a tela poder avisar que outro closer também falou com ela.
+ */
 export function filtrarConversas(conversas: ConversaDaLead[], quem: string, termo: string): ConversaDaLead[] {
   const t = semAcento(termo.trim()).toLowerCase();
-  return conversas.filter((c) => {
-    if (quem && !c.abordadaPor.includes(quem)) return false;
-    if (!t) return true;
-    const alvo = semAcento(
-      [c.nome, c.email, ...c.registros.map((r) => r.observacao)].join(" ")
-    ).toLowerCase();
-    return alvo.includes(t);
-  });
+  const saida: ConversaDaLead[] = [];
+  for (const c of conversas) {
+    const registros = quem ? c.registros.filter((r) => nomeDe(r) === quem) : c.registros;
+    if (!registros.length) continue;
+    if (t) {
+      const alvo = semAcento([c.nome, c.email, ...registros.map((r) => r.observacao)].join(" ")).toLowerCase();
+      if (!alvo.includes(t)) continue;
+    }
+    saida.push(quem ? { ...c, registros, ultimaEm: registros[0].em } : c);
+  }
+  return quem ? saida.sort((a, b) => b.ultimaEm.localeCompare(a.ultimaEm)) : saida;
 }
 
 // ── Prompt ──────────────────────────────────────────────────────────────

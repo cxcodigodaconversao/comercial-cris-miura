@@ -60,7 +60,11 @@ export async function POST(req: NextRequest) {
 
     let resposta: string;
     try {
-      resposta = await gerarTexto(SISTEMA_ANALISE, prompt);
+      resposta = await gerarTexto(SISTEMA_ANALISE, prompt, {
+        responseMimeType: "application/json",
+        // Sem "pensamento": a resposta precisa caber no tempo da função.
+        thinkingConfig: { thinkingBudget: 0 },
+      });
     } catch (e) {
       if (e instanceof ErroIA) throw new ErroApi(e.status, e.message);
       throw e;
